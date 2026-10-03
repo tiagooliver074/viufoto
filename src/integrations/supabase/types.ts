@@ -1765,6 +1765,62 @@ export type Database = {
         }
         Relationships: []
       }
+      logradouros: {
+        Row: {
+          busca: string | null
+          cep: string | null
+          cidade_id: number
+          created_at: string
+          id: number
+          latitude: number | null
+          localidade: string | null
+          longitude: number | null
+          nome_completo: string | null
+          nome_logradouro: string
+          qtd_enderecos: number
+          tipo_logradouro: string | null
+          titulo_logradouro: string | null
+        }
+        Insert: {
+          busca?: string | null
+          cep?: string | null
+          cidade_id: number
+          created_at?: string
+          id?: number
+          latitude?: number | null
+          localidade?: string | null
+          longitude?: number | null
+          nome_completo?: string | null
+          nome_logradouro: string
+          qtd_enderecos?: number
+          tipo_logradouro?: string | null
+          titulo_logradouro?: string | null
+        }
+        Update: {
+          busca?: string | null
+          cep?: string | null
+          cidade_id?: number
+          created_at?: string
+          id?: number
+          latitude?: number | null
+          localidade?: string | null
+          longitude?: number | null
+          nome_completo?: string | null
+          nome_logradouro?: string
+          qtd_enderecos?: number
+          tipo_logradouro?: string | null
+          titulo_logradouro?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logradouros_cidade_id_fkey"
+            columns: ["cidade_id"]
+            isOneToOne: false
+            referencedRelation: "cidades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       marketing_automation_settings: {
         Row: {
           auto_approve: boolean
@@ -3692,6 +3748,19 @@ export type Database = {
           nome_completo: string
           similaridade: number
           uf: string
+        }[]
+      }
+      buscar_enderecos: {
+        Args: { cidade_id_param: number; limite?: number; termo: string }
+        Returns: {
+          cep: string
+          cidade_id: number
+          id: number
+          latitude: number
+          localidade: string
+          longitude: number
+          nome_completo: string
+          similaridade: number
         }[]
       }
       claim_face_index_jobs: {
