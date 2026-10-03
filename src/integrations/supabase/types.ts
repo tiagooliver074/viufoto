@@ -1251,8 +1251,10 @@ export type Database = {
           password: string | null
           plan_type: string
           publish_at: string | null
+          reference_point: string | null
           search_type: string[] | null
           status: Database["public"]["Enums"]["event_status"]
+          street_address: string | null
           updated_at: string
           visibility: boolean
         }
@@ -1280,8 +1282,10 @@ export type Database = {
           password?: string | null
           plan_type?: string
           publish_at?: string | null
+          reference_point?: string | null
           search_type?: string[] | null
           status?: Database["public"]["Enums"]["event_status"]
+          street_address?: string | null
           updated_at?: string
           visibility?: boolean
         }
@@ -1309,8 +1313,10 @@ export type Database = {
           password?: string | null
           plan_type?: string
           publish_at?: string | null
+          reference_point?: string | null
           search_type?: string[] | null
           status?: Database["public"]["Enums"]["event_status"]
+          street_address?: string | null
           updated_at?: string
           visibility?: boolean
         }

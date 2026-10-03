@@ -27,6 +27,16 @@ interface CidadeSugestao {
   nome_completo: string;
 }
 
+interface EnderecoSugestao {
+  id: number;
+  cidade_id: number;
+  nome_completo: string;
+  localidade: string | null;
+  cep: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
 const searchTypes = [
   { key: "facial", label: "Reconhecimento Facial", icon: ScanFace, desc: "IA identifica rostos automaticamente" },
   { key: "album", label: "Álbum", icon: Image, desc: "Organize por pastas e jogos" },
@@ -47,6 +57,11 @@ const CriarEvento = () => {
   const [eventDate, setEventDate] = useState("");
   const [eventTime, setEventTime] = useState("");
   const [eventLocation, setEventLocation] = useState("");
+  const [selectedCidadeId, setSelectedCidadeId] = useState<number | null>(null);
+  const [streetAddress, setStreetAddress] = useState("");
+  const [referencePoint, setReferencePoint] = useState("");
+  const [showStreetSuggestions, setShowStreetSuggestions] = useState(false);
+  const [streetSuggestionsList, setStreetSuggestionsList] = useState<EnderecoSugestao[]>([]);
   const [eventCategory, setEventCategory] = useState("");
   const [selectedSearchTypes, setSelectedSearchTypes] = useState<string[]>([]);
   const [visibility, setVisibility] = useState<boolean | null>(null);
@@ -106,6 +121,34 @@ const CriarEvento = () => {
 
     return () => clearTimeout(timeoutId);
   }, [eventLocation]);
+
+  // Busca ruas/logradouros (Fase 2 — dados IBGE CNEFE) escopada pela cidade já escolhida.
+  useEffect(() => {
+    if (!selectedCidadeId) {
+      setStreetSuggestionsList([]);
+      return;
+    }
+    const termo = streetAddress.trim();
+    if (termo.length < 2) {
+      setStreetSuggestionsList([]);
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      const { data, error } = await supabase.rpc("buscar_enderecos", {
+        cidade_id_param: selectedCidadeId,
+        termo,
+        limite: 8,
+      });
+      if (error) {
+        console.error("Erro ao buscar endereços:", error);
+        return;
+      }
+      setStreetSuggestionsList((data as EnderecoSugestao[]) || []);
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [streetAddress, selectedCidadeId]);
 
   const filteredCategories = categories.filter((c) =>
     c.toLowerCase().includes((categorySearch || eventCategory).toLowerCase())
@@ -177,6 +220,8 @@ const CriarEvento = () => {
         event_date: eventDate,
         event_time: eventTime || null,
         location: eventLocation,
+        street_address: streetAddress.trim() || null,
+        reference_point: referencePoint.trim() || null,
         category: eventCategory,
         search_type: selectedSearchTypes,
         visibility: visibility ?? true,
@@ -438,7 +483,14 @@ const CriarEvento = () => {
                   type="text"
                   placeholder="Digite a cidade do evento"
                   value={eventLocation}
-                  onChange={(e) => { setEventLocation(e.target.value); setShowLocationSuggestions(true); setErrors((p) => ({ ...p, eventLocation: "" })); }}
+                  onChange={(e) => {
+                    setEventLocation(e.target.value);
+                    setShowLocationSuggestions(true);
+                    setErrors((p) => ({ ...p, eventLocation: "" }));
+                    // Cidade mudou manualmente: a rua selecionada antes não vale mais para a nova cidade.
+                    setSelectedCidadeId(null);
+                    setStreetAddress("");
+                  }}
                   onFocus={() => setShowLocationSuggestions(true)}
                   onBlur={() => setTimeout(() => setShowLocationSuggestions(false), 200)}
                   className={`w-full pl-10 pr-4 py-3 rounded-lg bg-secondary border text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors text-sm min-h-[48px] ${errors.eventLocation ? "border-red-500" : "border-border"}`}
@@ -449,7 +501,12 @@ const CriarEvento = () => {
                   {locationSuggestionsList.map((cidade) => (
                     <button
                       key={cidade.id}
-                      onMouseDown={() => { setEventLocation(cidade.nome_completo); setShowLocationSuggestions(false); }}
+                      onMouseDown={() => {
+                        setEventLocation(cidade.nome_completo);
+                        setSelectedCidadeId(cidade.id);
+                        setStreetAddress("");
+                        setShowLocationSuggestions(false);
+                      }}
                       className="w-full text-left px-4 py-3 text-sm text-foreground hover:bg-primary/10 transition-colors flex items-center gap-2"
                     >
                       <MapPin className="w-3 h-3 text-primary" />
@@ -459,6 +516,55 @@ const CriarEvento = () => {
                 </div>
               )}
               {errors.eventLocation && <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{errors.eventLocation}</p>}
+            </div>
+
+            <div className="relative">
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Rua / endereço <span className="text-muted-foreground font-normal">(opcional)</span>
+              </label>
+              <div className="relative">
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder={selectedCidadeId ? "Digite o nome da rua" : "Selecione a cidade acima primeiro"}
+                  value={streetAddress}
+                  disabled={!selectedCidadeId}
+                  onChange={(e) => { setStreetAddress(e.target.value); setShowStreetSuggestions(true); }}
+                  onFocus={() => setShowStreetSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowStreetSuggestions(false), 200)}
+                  className="w-full pl-10 pr-4 py-3 rounded-lg bg-secondary border border-border text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors text-sm min-h-[48px] disabled:opacity-50 disabled:cursor-not-allowed"
+                />
+              </div>
+              {showStreetSuggestions && streetSuggestionsList.length > 0 && (
+                <div className="absolute z-20 w-full mt-1 rounded-lg bg-secondary border border-border shadow-xl overflow-hidden">
+                  {streetSuggestionsList.map((rua) => (
+                    <button
+                      key={rua.id}
+                      onMouseDown={() => { setStreetAddress(rua.nome_completo); setShowStreetSuggestions(false); }}
+                      className="w-full text-left px-4 py-3 text-sm text-foreground hover:bg-primary/10 transition-colors flex items-center gap-2"
+                    >
+                      <MapPin className="w-3 h-3 text-primary" />
+                      <span>
+                        {rua.nome_completo}
+                        {rua.localidade && <span className="text-muted-foreground"> — {rua.localidade}</span>}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Ponto de referência <span className="text-muted-foreground font-normal">(opcional)</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Ex: Ginásio de Esportes, Praça Central, Clube X..."
+                value={referencePoint}
+                onChange={(e) => setReferencePoint(e.target.value)}
+                className="w-full px-4 py-3 rounded-lg bg-secondary border border-border text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors text-sm min-h-[48px]"
+              />
             </div>
 
             <div className="relative">
@@ -612,6 +718,8 @@ const CriarEvento = () => {
                 { label: "Data", value: eventDate ? new Date(eventDate + "T12:00:00").toLocaleDateString("pt-BR") : "" },
                 { label: "Horário", value: eventTime },
                 { label: "Local", value: eventLocation },
+                ...(streetAddress ? [{ label: "Rua", value: streetAddress }] : []),
+                ...(referencePoint ? [{ label: "Ponto de referência", value: referencePoint }] : []),
                 { label: "Categoria", value: eventCategory },
                 { label: "Busca", value: selectedSearchTypes.map((k) => searchTypes.find((s) => s.key === k)?.label).join(", ") },
                 { label: "Visibilidade", value: visibility ? "Público (marketplace)" : "Privado (apenas link)" },
