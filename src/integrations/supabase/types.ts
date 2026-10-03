@@ -10,10 +10,94 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.18"
   }
   public: {
     Tables: {
+      _cleanup_marker: {
+        Row: {
+          id: number | null
+        }
+        Insert: {
+          id?: number | null
+        }
+        Update: {
+          id?: number | null
+        }
+        Relationships: []
+      }
+      _migration_test: {
+        Row: {
+          id: number | null
+        }
+        Insert: {
+          id?: number | null
+        }
+        Update: {
+          id?: number | null
+        }
+        Relationships: []
+      }
+      _old_auth_users_staging: {
+        Row: {
+          banned_until: string | null
+          created_at: string | null
+          email: string | null
+          email_confirmed_at: string | null
+          id: string
+          is_anonymous: boolean | null
+          last_sign_in_at: string | null
+          phone: string | null
+          phone_confirmed_at: string | null
+          raw_app_meta_data: Json | null
+          raw_user_meta_data: Json | null
+          staged_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          banned_until?: string | null
+          created_at?: string | null
+          email?: string | null
+          email_confirmed_at?: string | null
+          id: string
+          is_anonymous?: boolean | null
+          last_sign_in_at?: string | null
+          phone?: string | null
+          phone_confirmed_at?: string | null
+          raw_app_meta_data?: Json | null
+          raw_user_meta_data?: Json | null
+          staged_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          banned_until?: string | null
+          created_at?: string | null
+          email?: string | null
+          email_confirmed_at?: string | null
+          id?: string
+          is_anonymous?: boolean | null
+          last_sign_in_at?: string | null
+          phone?: string | null
+          phone_confirmed_at?: string | null
+          raw_app_meta_data?: Json | null
+          raw_user_meta_data?: Json | null
+          staged_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      _test_del2: {
+        Row: {
+          id: number | null
+        }
+        Insert: {
+          id?: number | null
+        }
+        Update: {
+          id?: number | null
+        }
+        Relationships: []
+      }
       account_watermark_settings: {
         Row: {
           active_kind: string
@@ -327,6 +411,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      cidades: {
+        Row: {
+          busca: string | null
+          created_at: string
+          id: number
+          latitude: number | null
+          longitude: number | null
+          nome: string
+          nome_completo: string | null
+          uf: string
+        }
+        Insert: {
+          busca?: string | null
+          created_at?: string
+          id: number
+          latitude?: number | null
+          longitude?: number | null
+          nome: string
+          nome_completo?: string | null
+          uf: string
+        }
+        Update: {
+          busca?: string | null
+          created_at?: string
+          id?: number
+          latitude?: number | null
+          longitude?: number | null
+          nome?: string
+          nome_completo?: string | null
+          uf?: string
+        }
+        Relationships: []
       }
       coletivo_members: {
         Row: {
@@ -1067,70 +1184,37 @@ export type Database = {
       }
       event_videos: {
         Row: {
-          codec: string | null
           created_at: string
-          duration_seconds: number | null
           event_id: string
           file_hash: string | null
           file_name: string | null
           file_size: number | null
-          file_size_bytes: number | null
           file_url: string
-          height: number | null
           id: string
           photographer_id: string | null
-          poster_url: string | null
-          preview_url: string | null
-          processed_at: string | null
-          processing_error: string | null
-          status: Database["public"]["Enums"]["video_processing_status"]
-          thumbnail_url: string | null
           visibility: string | null
-          width: number | null
         }
         Insert: {
-          codec?: string | null
           created_at?: string
-          duration_seconds?: number | null
           event_id: string
           file_hash?: string | null
           file_name?: string | null
           file_size?: number | null
-          file_size_bytes?: number | null
           file_url: string
-          height?: number | null
           id?: string
           photographer_id?: string | null
-          poster_url?: string | null
-          preview_url?: string | null
-          processed_at?: string | null
-          processing_error?: string | null
-          status?: Database["public"]["Enums"]["video_processing_status"]
-          thumbnail_url?: string | null
           visibility?: string | null
-          width?: number | null
         }
         Update: {
-          codec?: string | null
           created_at?: string
-          duration_seconds?: number | null
           event_id?: string
           file_hash?: string | null
           file_name?: string | null
           file_size?: number | null
-          file_size_bytes?: number | null
           file_url?: string
-          height?: number | null
           id?: string
           photographer_id?: string | null
-          poster_url?: string | null
-          preview_url?: string | null
-          processed_at?: string | null
-          processing_error?: string | null
-          status?: Database["public"]["Enums"]["video_processing_status"]
-          thumbnail_url?: string | null
           visibility?: string | null
-          width?: number | null
         }
         Relationships: [
           {
@@ -1164,9 +1248,8 @@ export type Database = {
           name: string
           organizer_id: string
           owner_commission_pct: number
+          password: string | null
           plan_type: string
-          progressive_discount_enabled: boolean
-          progressive_discount_rules: Json
           publish_at: string | null
           search_type: string[] | null
           status: Database["public"]["Enums"]["event_status"]
@@ -1194,9 +1277,8 @@ export type Database = {
           name: string
           organizer_id: string
           owner_commission_pct?: number
+          password?: string | null
           plan_type?: string
-          progressive_discount_enabled?: boolean
-          progressive_discount_rules?: Json
           publish_at?: string | null
           search_type?: string[] | null
           status?: Database["public"]["Enums"]["event_status"]
@@ -1224,9 +1306,8 @@ export type Database = {
           name?: string
           organizer_id?: string
           owner_commission_pct?: number
+          password?: string | null
           plan_type?: string
-          progressive_discount_enabled?: boolean
-          progressive_discount_rules?: Json
           publish_at?: string | null
           search_type?: string[] | null
           status?: Database["public"]["Enums"]["event_status"]
@@ -1242,6 +1323,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      face_index_jobs: {
+        Row: {
+          attempts: number
+          created_at: string
+          enqueued_at: string
+          error_code: string | null
+          error_message: string | null
+          event_id: string
+          finished_at: string | null
+          id: string
+          photo_id: string
+          s3_key: string | null
+          started_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          enqueued_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          event_id: string
+          finished_at?: string | null
+          id?: string
+          photo_id: string
+          s3_key?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          enqueued_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          event_id?: string
+          finished_at?: string | null
+          id?: string
+          photo_id?: string
+          s3_key?: string | null
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
       }
       face_search_logs: {
         Row: {
@@ -3552,7 +3681,34 @@ export type Database = {
       }
     }
     Functions: {
+      _test_del_fn: { Args: never; Returns: undefined }
+      buscar_cidades: {
+        Args: { limite?: number; termo: string }
+        Returns: {
+          id: number
+          latitude: number
+          longitude: number
+          nome: string
+          nome_completo: string
+          similaridade: number
+          uf: string
+        }[]
+      }
+      claim_face_index_jobs: {
+        Args: { _batch_size?: number; _event_id: string }
+        Returns: {
+          job_id: string
+          photo_id: string
+          s3_key: string
+        }[]
+      }
       cleanup_old_logs: { Args: never; Returns: Json }
+      enqueue_event_backfill: {
+        Args: { _event_id: string; _force?: boolean }
+        Returns: {
+          enqueued: number
+        }[]
+      }
       ensure_face_collection: {
         Args: { _event_id: string }
         Returns: {
@@ -3561,6 +3717,7 @@ export type Database = {
         }[]
       }
       ensure_referral_code: { Args: { _user_id: string }; Returns: string }
+      f_unaccent: { Args: { "": string }; Returns: string }
       fraud_decide_case: {
         Args: { _case_id: string; _decision: string; _note?: string }
         Returns: undefined
@@ -3610,6 +3767,19 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: never; Returns: boolean }
+      mark_face_index_done: {
+        Args: { _faces_count: number; _job_id: string }
+        Returns: undefined
+      }
+      mark_face_index_error: {
+        Args: {
+          _error_code: string
+          _error_message: string
+          _job_id: string
+          _permanent?: boolean
+        }
+        Returns: undefined
+      }
       publish_scheduled_events: { Args: never; Returns: number }
       recalc_photographer_level: { Args: { _user_id: string }; Returns: string }
       refresh_photo_search_index: { Args: never; Returns: undefined }
@@ -3618,6 +3788,9 @@ export type Database = {
         Args: { _enabled: boolean; _user_id: string }
         Returns: undefined
       }
+      show_limit: { Args: never; Returns: number }
+      show_trgm: { Args: { "": string }; Returns: string[] }
+      unaccent: { Args: { "": string }; Returns: string }
       verify_event_password: {
         Args: { _event_id: string; _password: string }
         Returns: boolean
@@ -3658,7 +3831,6 @@ export type Database = {
         | "checkout_started"
         | "purchase_completed"
       search_kind: "facial" | "bib" | "album" | "none"
-      video_processing_status: "pending" | "processing" | "ready" | "failed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -3674,12 +3846,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3703,11 +3875,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3728,11 +3900,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3753,11 +3925,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3770,11 +3942,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -3818,7 +3990,6 @@ export const Constants = {
         "purchase_completed",
       ],
       search_kind: ["facial", "bib", "album", "none"],
-      video_processing_status: ["pending", "processing", "ready", "failed"],
     },
   },
 } as const

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import { Check, ChevronRight, ScanFace, Image, Eye, Camera, MapPin, AlertCircle, Info, Wallet, Users, Split, Shield } from "lucide-react";
@@ -20,17 +20,12 @@ const categories = [
   "Casamento", "Aniversário", "Corporativo", "Outro",
 ];
 
-const locationSuggestions: Record<string, string[]> = {
-  "joao": ["João Dourado - BA", "João Pessoa - PB", "João Monlevade - MG"],
-  "sal": ["Salvador - BA", "Salinas - MG", "Salto - SP"],
-  "sao": ["São Paulo - SP", "São Luís - MA", "São José dos Campos - SP", "São Carlos - SP"],
-  "rec": ["Recife - PE", "Recreio dos Bandeirantes - RJ"],
-  "rio": ["Rio de Janeiro - RJ", "Rio Branco - AC", "Rio Verde - GO"],
-  "bel": ["Belém - PA", "Belo Horizonte - MG", "Belford Roxo - RJ"],
-  "for": ["Fortaleza - CE", "Formosa - GO"],
-  "ire": ["Irecê - BA"],
-  "cam": ["Campinas - SP", "Campo Grande - MS", "Camaçari - BA"],
-};
+interface CidadeSugestao {
+  id: number;
+  nome: string;
+  uf: string;
+  nome_completo: string;
+}
 
 const searchTypes = [
   { key: "facial", label: "Reconhecimento Facial", icon: ScanFace, desc: "IA identifica rostos automaticamente" },
@@ -59,6 +54,7 @@ const CriarEvento = () => {
   const [priorityDate, setPriorityDate] = useState("");
   const [priorityTime, setPriorityTime] = useState("");
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
+  const [locationSuggestionsList, setLocationSuggestionsList] = useState<CidadeSugestao[]>([]);
   const [categorySearch, setCategorySearch] = useState("");
   const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
 
@@ -90,11 +86,26 @@ const CriarEvento = () => {
   // Validation
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const getLocationSuggestions = (input: string) => {
-    if (input.length < 2) return [];
-    const key = Object.keys(locationSuggestions).find((k) => input.toLowerCase().startsWith(k));
-    return key ? locationSuggestions[key] : [];
-  };
+  // Busca cidades brasileiras via RPC (base própria do ViuFoto, sem Google Maps
+  // e sem custo por consulta), com debounce para evitar excesso de chamadas.
+  useEffect(() => {
+    const termo = eventLocation.trim();
+    if (termo.length < 2) {
+      setLocationSuggestionsList([]);
+      return;
+    }
+
+    const timeoutId = setTimeout(async () => {
+      const { data, error } = await supabase.rpc("buscar_cidades", { termo, limite: 8 });
+      if (error) {
+        console.error("Erro ao buscar cidades:", error);
+        return;
+      }
+      setLocationSuggestionsList((data as CidadeSugestao[]) || []);
+    }, 300);
+
+    return () => clearTimeout(timeoutId);
+  }, [eventLocation]);
 
   const filteredCategories = categories.filter((c) =>
     c.toLowerCase().includes((categorySearch || eventCategory).toLowerCase())
@@ -433,16 +444,16 @@ const CriarEvento = () => {
                   className={`w-full pl-10 pr-4 py-3 rounded-lg bg-secondary border text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors text-sm min-h-[48px] ${errors.eventLocation ? "border-red-500" : "border-border"}`}
                 />
               </div>
-              {showLocationSuggestions && getLocationSuggestions(eventLocation).length > 0 && (
+              {showLocationSuggestions && locationSuggestionsList.length > 0 && (
                 <div className="absolute z-20 w-full mt-1 rounded-lg bg-secondary border border-border shadow-xl overflow-hidden">
-                  {getLocationSuggestions(eventLocation).map((loc) => (
+                  {locationSuggestionsList.map((cidade) => (
                     <button
-                      key={loc}
-                      onMouseDown={() => { setEventLocation(loc); setShowLocationSuggestions(false); }}
+                      key={cidade.id}
+                      onMouseDown={() => { setEventLocation(cidade.nome_completo); setShowLocationSuggestions(false); }}
                       className="w-full text-left px-4 py-3 text-sm text-foreground hover:bg-primary/10 transition-colors flex items-center gap-2"
                     >
                       <MapPin className="w-3 h-3 text-primary" />
-                      {loc}
+                      {cidade.nome_completo}
                     </button>
                   ))}
                 </div>
