@@ -137,7 +137,7 @@ export function PhotoManager({ open, onClose, photos, onDelete, onUpdateStatus, 
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-[95vw] w-full h-[90vh] flex flex-col p-0 overflow-hidden bg-background border-border">
+      <DialogContent hideClose className="max-w-[95vw] w-full h-[90vh] flex flex-col p-0 overflow-hidden bg-background border-border">
         {/* Top Header */}
         <div className="p-6 border-b border-border bg-card">
           <div className="flex items-center justify-between mb-6">

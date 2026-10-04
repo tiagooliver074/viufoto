@@ -31,7 +31,7 @@ import { setEventPassword } from "@/lib/eventAccess";
 import { resizeImage } from "@/lib/imageResize";
 import {
   Edit, ShoppingCart, DollarSign, Upload, Image, MoreHorizontal, Lock, Megaphone, Tag,
-  Video, FileDown, Eye, Check, ChevronRight, Users, BarChart3, X, Trash2, Copy, Share2,
+  Video, Eye, Check, ChevronRight, Users, BarChart3, X, Trash2, Copy, Share2,
   ExternalLink, MessageCircle, UserPlus
 } from "lucide-react";
 import { motion } from "framer-motion";
@@ -181,7 +181,6 @@ const EventDashboard = () => {
       items: [
         { label: "Editar", icon: Edit, key: "edit" },
         { label: "Senha", icon: Lock, key: "password" },
-        { label: "Importar Pedidos", icon: FileDown, key: "import" },
         { label: "Mais Ações", icon: MoreHorizontal, key: "actions" },
       ],
     },
@@ -218,6 +217,7 @@ const EventDashboard = () => {
 
   const handleDuplicateEvent = async () => {
     if (!event) return;
+    if (!confirm(`Duplicar o evento "${event.name}"? Um novo evento será criado com os mesmos dados.`)) return;
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Não autenticado");

@@ -174,7 +174,7 @@ export function VideoManager({ open, onClose, videos, onDelete, onUpdateStatus, 
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-[95vw] w-full h-[90vh] flex flex-col p-0 overflow-hidden bg-background border-border">
+      <DialogContent hideClose className="max-w-[95vw] w-full h-[90vh] flex flex-col p-0 overflow-hidden bg-background border-border">
         {/* Top Header */}
         <div className="p-6 border-b border-border bg-card">
           <div className="flex items-center justify-between mb-6">
@@ -546,7 +546,7 @@ export function VideoManager({ open, onClose, videos, onDelete, onUpdateStatus, 
 
       {/* Video Player Dialog */}
       <Dialog open={!!playerVideo} onOpenChange={(o) => !o && setPlayerVideo(null)}>
-        <DialogContent className="max-w-4xl p-0 bg-black overflow-hidden border-none aspect-video flex items-center justify-center">
+        <DialogContent hideClose className="max-w-4xl p-0 bg-black overflow-hidden border-none aspect-video flex items-center justify-center">
           <div className="w-full h-full relative group">
             {playerVideo && (
               <video 
