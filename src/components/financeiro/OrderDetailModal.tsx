@@ -22,7 +22,7 @@ interface Props {
 }
 
 interface SignedFile {
-  id: string; name: string | null; type: "photo" | "video"; url: string | null; resolution?: string;
+  id: string; name: string | null; type: "photo" | "video"; url: string | null;
 }
 
 export default function OrderDetailModal({ order, onClose }: Props) {

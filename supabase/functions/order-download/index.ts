@@ -121,23 +121,21 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Get order items with photo/video paths
+      // Get order items with photo/video paths.
+      // NOTA: a coluna order_items.resolution ("high"/"low") é vestígio de uma
+      // opção de resolução reduzida ("Foto Social") que nunca foi exposta na
+      // UI de compra (nenhum fluxo do carrinho define "low") nem tem um
+      // arquivo comercial correspondente gerado pela Lambda de imagem — por
+      // isso foi removida da lógica de entrega. Hoje todo pedido entrega o
+      // arquivo ORIGINAL (alta resolução, sem marca d'água).
       const { data: items, error: itemsErr } = await supabaseAdmin
         .from("order_items")
-        .select("id, photo_id, video_id, price, resolution")
+        .select("id, photo_id, video_id, price")
         .eq("order_id", order_id);
 
       if (itemsErr) throw itemsErr;
 
-      // Map photo_id -> resolution (high = original, low = medium/social)
-      const photoResolution = new Map<string, "high" | "low">();
-      (items || []).forEach(i => {
-        if (i.photo_id) {
-          photoResolution.set(i.photo_id, (i.resolution === "low" ? "low" : "high"));
-        }
-      });
-
-      const photoIds = Array.from(photoResolution.keys());
+      const photoIds = (items || []).filter(i => i.photo_id).map(i => i.photo_id!);
       const videoIds = (items || []).filter(i => i.video_id).map(i => i.video_id!);
 
       // Fetch file paths from event_photos and event_videos
@@ -160,32 +158,15 @@ Deno.serve(async (req) => {
         videos = data || [];
       }
 
-      // Resolve the actual S3 path based on the purchased resolution.
-      // - high  -> /original/  (no watermark, full resolution)
-      // - low   -> /medium/    (1200px — "Foto Social", CLEAN file, no watermark)
-      // The Lambda pipeline writes processed variants under
-      //   {dir}/medium/{filename}.jpg  and keeps the original at the original path.
-      const resolvePhotoPath = (originalPath: string, resolution: "high" | "low") => {
-        if (resolution === "high") return originalPath;
-        const lastSlash = originalPath.lastIndexOf("/");
-        if (lastSlash === -1) return originalPath;
-        const dir = originalPath.substring(0, lastSlash);
-        const filename = originalPath.substring(lastSlash + 1).replace(/\.[^.]+$/, ".jpg");
-        return `${dir}/medium/${filename}`;
-      };
-
-      // Generate signed read URLs for all files (24h expiration)
+      // Entrega sempre o arquivo ORIGINAL (alta resolução, sem marca d'água) —
+      // não existe mais um tier de resolução reduzida nesta função.
       const allFiles = [
-        ...photos.map(p => {
-          const res = photoResolution.get(p.id) ?? "high";
-          return {
-            id: p.id,
-            path: resolvePhotoPath(p.file_url, res),
-            name: p.file_name,
-            type: "photo",
-            resolution: res,
-          };
-        }),
+        ...photos.map(p => ({
+          id: p.id,
+          path: p.file_url,
+          name: p.file_name,
+          type: "photo",
+        })),
         ...videos.map(v => ({ id: v.id, path: v.file_url, name: v.file_name, type: "video" })),
       ];
 
@@ -274,14 +255,10 @@ Deno.serve(async (req) => {
 
       const { data: items } = await supabaseAdmin
         .from("order_items")
-        .select("id, photo_id, video_id, resolution")
+        .select("id, photo_id, video_id")
         .eq("order_id", order_id);
 
-      const photoResolution = new Map<string, "high" | "low">();
-      (items || []).forEach(i => {
-        if (i.photo_id) photoResolution.set(i.photo_id, (i.resolution === "low" ? "low" : "high"));
-      });
-      const photoIds = Array.from(photoResolution.keys());
+      const photoIds = (items || []).filter(i => i.photo_id).map(i => i.photo_id!);
       const videoIds = (items || []).filter(i => i.video_id).map(i => i.video_id!);
 
       let photos: { id: string; file_url: string; file_name: string | null }[] = [];
@@ -295,24 +272,14 @@ Deno.serve(async (req) => {
         videos = data || [];
       }
 
-      const resolvePhotoPath = (originalPath: string, resolution: "high" | "low") => {
-        if (resolution === "high") return originalPath;
-        const lastSlash = originalPath.lastIndexOf("/");
-        if (lastSlash === -1) return originalPath;
-        const dir = originalPath.substring(0, lastSlash);
-        const filename = originalPath.substring(lastSlash + 1).replace(/\.[^.]+$/, ".jpg");
-        return `${dir}/medium/${filename}`;
-      };
-
       const allFiles = [
         ...photos.map(p => ({
           id: p.id,
-          path: resolvePhotoPath(p.file_url, photoResolution.get(p.id) ?? "high"),
+          path: p.file_url,
           name: p.file_name,
           type: "photo" as const,
-          resolution: photoResolution.get(p.id) ?? "high",
         })),
-        ...videos.map(v => ({ id: v.id, path: v.file_url, name: v.file_name, type: "video" as const, resolution: "high" as const })),
+        ...videos.map(v => ({ id: v.id, path: v.file_url, name: v.file_name, type: "video" as const })),
       ];
 
       const signedFiles: any[] = [];

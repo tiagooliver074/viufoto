@@ -118,7 +118,7 @@ const CartDrawer = () => {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{item.eventName}</p>
                         <p className="text-xs text-muted-foreground">
-                          {item.videoId ? "Vídeo original" : (item.resolution === "high" ? "Alta resolução" : "Baixa resolução")}
+                          {item.videoId ? "Vídeo original" : "Alta resolução"}
                         </p>
                         {item.photoId && (
                           <p className="text-[10px] font-mono text-muted-foreground/80 mt-0.5">

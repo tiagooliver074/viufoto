@@ -35,7 +35,6 @@ async function getPublicSignedUrls(paths: string[]): Promise<Record<string, stri
 const FotoPage = () => {
   const { photoId } = useParams<{ photoId: string }>();
   const navigate = useNavigate();
-  const [resolution, setResolution] = useState<"high" | "low">("high");
   const [copied, setCopied] = useState(false);
   const { addItem } = useCart();
   const { isFavorite, toggleFavorite } = useFavorites();

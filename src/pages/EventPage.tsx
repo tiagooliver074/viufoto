@@ -64,7 +64,6 @@ const EventPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedPhoto, setSelectedPhoto] = useState<any>(null);
   const [searchBib, setSearchBib] = useState("");
-  const [resolution, setResolution] = useState<"high" | "low">("high");
   const [passwordInput, setPasswordInput] = useState("");
   const [accessToken, setAccessToken] = useState<string | null>(() => getStoredAccess(id)?.token ?? null);
   const [verifying, setVerifying] = useState(false);

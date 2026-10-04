@@ -122,7 +122,7 @@ export const OrderDetailsModal = ({ orderId, onClose }: OrderDetailsModalProps) 
                             {item.photo_id ? 'Fotografia' : 'Vídeo'}
                           </p>
                           <Badge variant="outline" className="text-[9px] uppercase tracking-tighter px-1.5 h-4">
-                            {item.resolution === 'high' ? 'Alta Resolução' : 'Resolução Média'}
+                            {item.photo_id ? 'Alta Resolução' : 'Vídeo Original'}
                           </Badge>
                         </div>
                         <p className="text-[10px] text-muted-foreground font-mono truncate">

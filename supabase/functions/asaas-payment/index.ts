@@ -249,12 +249,16 @@ Deno.serve(async (req) => {
       if (orderError) throw new Error(`Order error: ${orderError.message}`);
 
       // 6. Create order items
+      // NOTA: order_items.resolution é vestígio de uma opção de resolução
+      // reduzida que nunca foi exposta no checkout (vem sempre "high" do
+      // carrinho). Gravamos sempre "high" — a coluna continua existindo no
+      // banco (default 'high') só para não exigir uma migração agora.
       const orderItems = items.map((item: any) => ({
         order_id: order.id,
         photo_id: item.photoId || null,
         video_id: item.videoId || null,
         price: item.price,
-        resolution: item.resolution === "low" ? "low" : "high",
+        resolution: "high",
       }));
 
       const { error: itemsError } = await supabaseAdmin

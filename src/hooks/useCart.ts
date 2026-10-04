@@ -8,7 +8,15 @@ interface CartItem {
   photoUrl: string;
   eventId?: string;
   eventName: string;
-  resolution: "high" | "low";
+  /**
+   * Sempre "high": a opção de resolução reduzida ("Foto Social") nunca foi
+   * exposta na UI de compra (nenhum botão define "low") e a Lambda de
+   * imagem não gera um arquivo comercial separado para ela — era um
+   * vestígio de versões anteriores. Mantido como tipo literal em vez de
+   * removido para não quebrar o shape salvo no localStorage de carrinhos
+   * já existentes.
+   */
+  resolution: "high";
   price: number;
 }
 
