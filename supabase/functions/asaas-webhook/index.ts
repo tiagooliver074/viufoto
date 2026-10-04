@@ -17,6 +17,27 @@ Deno.serve(async (req) => {
     return new Response("ok", { headers: corsHeaders });
   }
 
+  // Segurança: a Asaas assina cada chamada de webhook com o token configurado
+  // no painel ("Token de autenticação"), reenviado no header asaas-access-token.
+  // Sem essa checagem, qualquer um com a URL pública da função conseguiria forjar
+  // um PAYMENT_RECEIVED/PAYMENT_CONFIRMED para um pedido real e creditar o
+  // wallet_ledger sem pagar nada (o verify_jwt do Supabase não protege aqui, pois
+  // a anon/publishable key é pública no bundle do frontend).
+  const expectedToken = Deno.env.get("ASAAS_WEBHOOK_TOKEN");
+  const receivedToken = req.headers.get("asaas-access-token");
+  if (!expectedToken) {
+    console.error("ASAAS_WEBHOOK_TOKEN not configured — rejecting webhook for safety");
+    return new Response(JSON.stringify({ error: "Webhook not configured" }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  if (receivedToken !== expectedToken) {
+    console.error("Invalid or missing asaas-access-token header");
+    return new Response(JSON.stringify({ error: "Unauthorized" }), {
+      status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   try {
     const body = await req.json();
     console.log("ASAAS Webhook received:", JSON.stringify(body));
