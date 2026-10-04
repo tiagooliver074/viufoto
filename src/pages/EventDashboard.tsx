@@ -31,8 +31,8 @@ import { setEventPassword } from "@/lib/eventAccess";
 import { resizeImage } from "@/lib/imageResize";
 import {
   Edit, ShoppingCart, DollarSign, Upload, Image, MoreHorizontal, Lock, Megaphone, Tag,
-  Video, FileDown, Camera as CameraIcon, Eye, Check, ChevronRight, Users, BarChart3, X, Trash2, Copy, Share2,
-  ExternalLink, MessageCircle
+  Video, FileDown, Eye, Check, ChevronRight, Users, BarChart3, X, Trash2, Copy, Share2,
+  ExternalLink, MessageCircle, UserPlus
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { shareBaseUrl } from "@/lib/shareUrl";
@@ -40,22 +40,14 @@ import { PageTitle, PageSubtitle, SectionTitle, CardTitle, Caption } from "@/com
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
 
-const quickActions = [
-  { label: "Editar", icon: Edit, key: "edit" },
-  { label: "Pedidos", icon: ShoppingCart, key: "orders" },
-  { label: "Financeiro", icon: DollarSign, key: "financial" },
-  { label: "Enviar Fotos", icon: Upload, key: "upload-photos" },
-  { label: "Fotos", icon: Image, key: "photos" },
-  { label: "Senha", icon: Lock, key: "password" },
-  { label: "Divulgação", icon: Megaphone, key: "promo" },
-  { label: "Colaboração", icon: Users, key: "collab" },
-  { label: "Enviar Vídeos", icon: Video, key: "upload-videos" },
-  { label: "Vídeos", icon: Video, key: "videos" },
-  { label: "Importar Pedidos", icon: FileDown, key: "import" },
-  { label: "Convidar", icon: CameraIcon, key: "invite" },
-  { label: "Galeria", icon: Eye, key: "gallery" },
-  { label: "Ações", icon: MoreHorizontal, key: "actions" },
-];
+// Mesmas ações de sempre (handleAction abaixo trata cada key exatamente como
+// antes), apenas reorganizadas em grupos para a nova toolbar compacta.
+// A key "gallery" (antigo botão "Galeria") abria o mesmo modal de
+// "Enviar Fotos" (setShowGallery) e por isso não ganhou um item próprio
+// aqui — a função continua acessível por "Enviar Fotos" e por "Ver galeria"
+// no cabeçalho, nada foi removido.
+type ActionItem = { label: string; icon: typeof Edit; key: string; secondary?: string };
+type ActionGroup = { title: string; items: ActionItem[] };
 
 const EventDashboard = () => {
   const { id } = useParams();
@@ -156,6 +148,44 @@ const EventDashboard = () => {
       default: break;
     }
   };
+
+  // Agrupamento visual da toolbar "Ações rápidas" — mesmas keys/handlers de
+  // sempre (handleAction acima), só a organização em categorias é nova.
+  const actionGroups: ActionGroup[] = [
+    {
+      title: "Gestão",
+      items: [
+        { label: "Pedidos", icon: ShoppingCart, key: "orders", secondary: String(orders.length) },
+        { label: "Financeiro", icon: DollarSign, key: "financial", secondary: `R$ ${totalRevenue.toFixed(0)}` },
+        { label: "Colaboração", icon: Users, key: "collab" },
+      ],
+    },
+    {
+      title: "Mídia",
+      items: [
+        { label: "Enviar Fotos", icon: Upload, key: "upload-photos" },
+        { label: "Fotos", icon: Image, key: "photos", secondary: String(photos.length) },
+        { label: "Enviar Vídeos", icon: Video, key: "upload-videos" },
+        { label: "Vídeos", icon: Video, key: "videos", secondary: String(videos.length) },
+      ],
+    },
+    {
+      title: "Divulgação",
+      items: [
+        { label: "Divulgação", icon: Megaphone, key: "promo" },
+        { label: "Convidar", icon: UserPlus, key: "invite" },
+      ],
+    },
+    {
+      title: "Configurações",
+      items: [
+        { label: "Editar", icon: Edit, key: "edit" },
+        { label: "Senha", icon: Lock, key: "password" },
+        { label: "Importar Pedidos", icon: FileDown, key: "import" },
+        { label: "Mais Ações", icon: MoreHorizontal, key: "actions" },
+      ],
+    },
+  ];
 
   const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -267,17 +297,17 @@ const EventDashboard = () => {
           <p className="text-xs text-muted-foreground">{event.id.slice(0, 8)} · {event.name}</p>
         </div>
 
-        {/* Hero Card */}
+        {/* Hero Card — cabeçalho compacto do evento (não é mais um banner grande) */}
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35 }}
-          className="relative overflow-hidden rounded-2xl bg-card border border-border shadow-sm mb-6"
+          className="relative overflow-hidden rounded-2xl bg-card border border-border shadow-sm mb-5"
         >
-          {/* Banner */}
+          {/* Faixa com a capa do evento como plano de fundo */}
           <div
             onClick={() => coverInputRef.current?.click()}
-            className="relative h-40 sm:h-48 w-full cursor-pointer group bg-gradient-to-br from-primary/90 via-primary to-primary/70"
+            className="relative py-4 sm:py-5 px-5 cursor-pointer group bg-gradient-to-br from-primary/90 via-primary to-primary/70 overflow-hidden"
           >
             {event.cover_url && (
               <img
@@ -288,88 +318,94 @@ const EventDashboard = () => {
                 className="absolute inset-0 w-full h-full object-cover"
               />
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-black/10" />
-            <div className="absolute top-4 right-4 z-10" onClick={(e) => e.stopPropagation()}>
-              <StatusDropdown
-                status={event.status}
-                publishAt={(event as any).publish_at}
-                onChange={(s) => {
-                  if (s === "agendado") { setShowSchedule(true); return; }
-                  updateEvent.mutate({ status: s, publish_at: null } as any);
-                }}
-                disabled={updateEvent.isPending}
-              />
-            </div>
-            <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between gap-4">
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-black/10" />
+            <div className="relative flex items-start justify-between gap-3 flex-wrap">
               <div className="min-w-0">
                 <p className="text-[10px] font-bold tracking-widest text-white/70">#{event.id.slice(0, 8).toUpperCase()}</p>
                 <PageTitle className="text-white drop-shadow truncate">{event.name}</PageTitle>
-                <p className="body-small text-white/80 mt-0.5">
+                <p className="body-small text-white/80 mt-0.5 truncate">
                   {new Date(event.event_date).toLocaleDateString("pt-BR")} · {event.location}
                 </p>
               </div>
-              <button
-                onClick={(e) => { e.stopPropagation(); coverInputRef.current?.click(); }}
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white text-xs font-medium transition-colors"
-              >
-                <Image className="w-3.5 h-3.5" /> Trocar capa
-              </button>
+              <div className="flex items-center gap-2 shrink-0" onClick={(e) => e.stopPropagation()}>
+                <StatusDropdown
+                  status={event.status}
+                  publishAt={(event as any).publish_at}
+                  onChange={(s) => {
+                    if (s === "agendado") { setShowSchedule(true); return; }
+                    updateEvent.mutate({ status: s, publish_at: null } as any);
+                  }}
+                  disabled={updateEvent.isPending}
+                />
+                <button
+                  onClick={(e) => { e.stopPropagation(); coverInputRef.current?.click(); }}
+                  className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 backdrop-blur-sm text-white text-xs font-medium transition-colors"
+                >
+                  <Image className="w-3.5 h-3.5" /> Trocar capa
+                </button>
+              </div>
             </div>
             <input ref={coverInputRef} type="file" accept="image/*" onChange={handleCoverUpload} className="hidden" />
           </div>
 
-          {/* CTA row */}
-          <div className="px-5 py-4 flex flex-wrap gap-2 border-b border-border/60">
+          {/* CTA row — compacta */}
+          <div className="px-5 py-2.5 flex flex-wrap gap-2 bg-card">
             <button
               onClick={handleShareLink}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-all shadow-sm hover:shadow"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition-all shadow-sm hover:shadow"
             >
-              <Share2 className="w-4 h-4" /> Compartilhar evento
+              <Share2 className="w-3.5 h-3.5" /> Compartilhar evento
             </button>
             <button
               onClick={handleOpenGallery}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium hover:border-primary/40 hover:text-primary transition-all"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-background text-foreground text-xs font-medium hover:border-primary/40 hover:text-primary transition-all"
             >
-              <Eye className="w-4 h-4" /> Ver galeria
+              <Eye className="w-3.5 h-3.5" /> Ver galeria
             </button>
             <button
               onClick={handleShareWhatsApp}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border bg-background text-foreground text-sm font-medium hover:bg-secondary/50 transition-all"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-background text-foreground text-xs font-medium hover:bg-secondary/50 transition-all"
             >
-              <MessageCircle className="w-4 h-4 text-emerald-500" /> WhatsApp
+              <MessageCircle className="w-3.5 h-3.5 text-emerald-500" /> WhatsApp
             </button>
-          </div>
-
-          {/* Quick Actions grid */}
-          <div className="p-5">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Ações rápidas</p>
-            <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
-              {quickActions.map((a, idx) => (
-                <motion.button
-                  key={a.key}
-                  onClick={() => handleAction(a.key)}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.25, delay: idx * 0.02 }}
-                  className="group flex flex-col items-center justify-center gap-2 p-3 rounded-xl bg-background border border-border hover:border-primary/50 hover:shadow-md hover:-translate-y-0.5 transition-all"
-                >
-                  <div className="w-9 h-9 rounded-lg bg-secondary/60 group-hover:bg-primary/10 flex items-center justify-center transition-colors">
-                    <a.icon className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-                  </div>
-                  <span className="text-[10px] font-medium text-muted-foreground group-hover:text-foreground leading-tight text-center">{a.label}</span>
-                </motion.button>
-              ))}
-            </div>
           </div>
         </motion.div>
 
+        {/* Ações rápidas — toolbar compacta agrupada por categoria */}
+        <div className="rounded-2xl bg-card border border-border shadow-sm p-4 sm:p-5 mb-6">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-3">Ações rápidas</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-5 gap-y-4">
+            {actionGroups.map((group) => (
+              <div key={group.title}>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 mb-1.5 px-0.5">{group.title}</p>
+                <div className="rounded-lg border border-border/60 divide-y divide-border/60 overflow-hidden">
+                  {group.items.map((item) => (
+                    <button
+                      key={item.key}
+                      onClick={() => handleAction(item.key)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-secondary/50 transition-colors text-left"
+                    >
+                      <item.icon className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <span className="text-sm text-foreground flex-1 truncate">{item.label}</span>
+                      {item.secondary && (
+                        <span className="text-xs text-muted-foreground shrink-0">{item.secondary}</span>
+                      )}
+                      <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/50 shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Three main cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
           <button
             onClick={() => setShowPriceGrid(true)}
-            className="text-left rounded-2xl bg-card border border-border p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 hover:border-primary/30 transition-all"
+            className="text-left rounded-2xl bg-card border border-border p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 hover:border-primary/30 transition-all"
           >
-            <div className="flex items-start justify-between mb-4">
+            <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
                   <DollarSign className="w-4 h-4 text-primary" />
@@ -391,9 +427,9 @@ const EventDashboard = () => {
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); setShowDiscount(true); }}
-            className="text-left rounded-2xl bg-card border border-border p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 hover:border-primary/30 transition-all"
+            className="text-left rounded-2xl bg-card border border-border p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 hover:border-primary/30 transition-all"
           >
-            <div className="flex items-start justify-between mb-4">
+            <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-lg bg-emerald-500/10 flex items-center justify-center">
                   <Tag className="w-4 h-4 text-emerald-600" />
@@ -416,9 +452,9 @@ const EventDashboard = () => {
 
           <button
             onClick={() => setShowOrders(true)}
-            className="text-left rounded-2xl bg-card border border-border p-5 shadow-sm hover:shadow-md hover:-translate-y-0.5 hover:border-primary/30 transition-all"
+            className="text-left rounded-2xl bg-card border border-border p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 hover:border-primary/30 transition-all"
           >
-            <div className="flex items-start justify-between mb-4">
+            <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-lg bg-orange-500/10 flex items-center justify-center">
                   <ShoppingCart className="w-4 h-4 text-orange-600" />
@@ -440,12 +476,12 @@ const EventDashboard = () => {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
 
           <button
             type="button"
             onClick={() => setShowEdit(true)}
-            className="text-left rounded-2xl bg-card border border-border p-5 shadow-sm hover:border-primary/40 hover:shadow-md transition-all"
+            className="text-left rounded-2xl bg-card border border-border p-4 shadow-sm hover:border-primary/40 hover:shadow-md transition-all"
           >
             <div className="flex items-center gap-2.5 mb-3">
               <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -473,7 +509,7 @@ const EventDashboard = () => {
             </div>
           </button>
 
-          <div className="relative rounded-2xl p-5 shadow-lg overflow-hidden bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
+          <div className="relative rounded-2xl p-4 shadow-lg overflow-hidden bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
             <div className="absolute -right-8 -bottom-8 w-32 h-32 rounded-full bg-white/10 blur-2xl" />
             <div className="relative">
               <div className="flex items-center justify-between mb-2">
@@ -503,7 +539,7 @@ const EventDashboard = () => {
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: i * 0.06 }}
-              className="rounded-2xl bg-card border border-border p-5 shadow-sm hover:shadow-md transition-all"
+              className="rounded-2xl bg-card border border-border p-4 shadow-sm hover:shadow-md transition-all"
             >
               <p className="caption font-bold uppercase tracking-widest text-muted-foreground mb-1.5">{k.label}</p>
               <SectionTitle className="tracking-tight">{k.value}</SectionTitle>
@@ -513,7 +549,7 @@ const EventDashboard = () => {
         </div>
 
         {/* Secondary actions row */}
-        <div className="flex flex-wrap gap-2 mb-6">
+        <div className="flex flex-wrap gap-2 mb-5">
           {[
             { label: "Fotos Vendidas", action: () => setShowGallery(true) },
             { label: "Vídeos Vendidos", action: () => toast.info("Em breve!") },
@@ -534,7 +570,7 @@ const EventDashboard = () => {
 
         {/* Coupons List */}
         {coupons.length > 0 && (
-          <div className="glass-card p-4 mb-6">
+          <div className="glass-card p-4 mb-5">
             <Caption className="font-bold text-foreground mb-3">CUPONS ATIVOS</Caption>
             <div className="space-y-2">
               {coupons.map(c => (
@@ -571,8 +607,8 @@ const EventDashboard = () => {
           const doneCount = steps.filter(s => s.done).length;
           const progressPct = Math.max(0, Math.min(100, ((doneCount - 1) / (steps.length - 1)) * 100));
           return (
-            <div className="rounded-2xl bg-card border border-border shadow-sm p-6 mb-6">
-              <div className="flex items-center justify-between mb-6">
+            <div className="rounded-2xl bg-card border border-border shadow-sm p-5 mb-5">
+              <div className="flex items-center justify-between mb-5">
                 <SectionTitle className="text-base sm:text-lg">Progresso do Evento</SectionTitle>
                 <span className="text-xs text-muted-foreground font-medium">{doneCount} de {steps.length}</span>
               </div>
