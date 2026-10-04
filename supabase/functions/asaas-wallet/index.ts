@@ -43,7 +43,7 @@ async function asaasFetch(path: string, options: RequestInit = {}) {
 async function getProfile(supabaseAdmin: any, userId: string) {
   const { data } = await supabaseAdmin
     .from("profiles")
-    .select("asaas_wallet_id, full_name, cpf_cnpj, phone")
+    .select("asaas_wallet_id, full_name, cpf_cnpj, phone, postal_code, address, address_number, address_complement, province, city, state")
     .eq("user_id", userId)
     .single();
   return data;
@@ -128,13 +128,21 @@ Deno.serve(async (req) => {
 
     // ─── CREATE WALLET ───
     if (action === "create_wallet") {
-      const { name, email, cpfCnpj, phone, birthDate } = params;
+      const { name, email, cpfCnpj, phone, birthDate, postalCode, address, addressNumber, addressComplement, province, city, state } = params;
       if (!name || !email || !cpfCnpj) return json({ error: "Nome, e-mail e CPF/CNPJ são obrigatórios" });
+      // A Asaas exige telefone celular e endereço completo para criar a conta de recebimento.
+      if (!phone) return json({ error: "Telefone é obrigatório" });
+      if (!postalCode) return json({ error: "É necessário informar o CEP." });
+      if (!address) return json({ error: "É necessário informar o endereço (logradouro)." });
+      if (!addressNumber) return json({ error: "É necessário informar o número do endereço." });
+      if (!province) return json({ error: "É necessário informar o bairro." });
 
       const profile = await getProfile(supabaseAdmin, user.id);
       if (profile?.asaas_wallet_id) return json({ walletId: profile.asaas_wallet_id, message: "Carteira já configurada" });
 
       const cleanCpfCnpj = cpfCnpj.replace(/\D/g, "");
+      const cleanPostalCode = postalCode.replace(/\D/g, "");
+      if (cleanPostalCode.length !== 8) return json({ error: "CEP inválido." });
 
       // Parse birthDate to YYYY-MM-DD (Asaas required format)
       let formattedBirthDate: string | null = null;
@@ -153,14 +161,20 @@ Deno.serve(async (req) => {
         }
       }
 
-      const cleanPhone = phone ? phone.replace(/\D/g, "") : null;
+      const cleanPhone = phone.replace(/\D/g, "");
 
       const accountData: Record<string, unknown> = {
         name, email, cpfCnpj: cleanCpfCnpj,
         companyType: cleanCpfCnpj.length > 11 ? "LIMITED" : "MEI",
         loginEmail: email,
         incomeValue: 5000,
-        ...(cleanPhone ? { phone: cleanPhone, mobilePhone: cleanPhone } : {}),
+        phone: cleanPhone,
+        mobilePhone: cleanPhone,
+        postalCode: cleanPostalCode,
+        address,
+        addressNumber,
+        province,
+        ...(addressComplement ? { complement: addressComplement } : {}),
         ...(formattedBirthDate ? { birthDate: formattedBirthDate } : {}),
       };
 
@@ -200,7 +214,12 @@ Deno.serve(async (req) => {
       }
 
       await supabaseAdmin.from("profiles")
-        .update({ asaas_wallet_id: walletId, full_name: name, cpf_cnpj: cpfCnpj, phone: phone || null })
+        .update({
+          asaas_wallet_id: walletId, full_name: name, cpf_cnpj: cpfCnpj, phone: phone || null,
+          postal_code: cleanPostalCode, address, address_number: addressNumber,
+          address_complement: addressComplement || null, province,
+          city: city || null, state: state || null,
+        })
         .eq("user_id", user.id);
 
       return json({ walletId, message: "Recebimento configurado com sucesso!" });
@@ -214,6 +233,13 @@ Deno.serve(async (req) => {
         walletId: profile?.asaas_wallet_id || null,
         name: profile?.full_name || null,
         cpfCnpj: profile?.cpf_cnpj || null,
+        postalCode: profile?.postal_code || null,
+        address: profile?.address || null,
+        addressNumber: profile?.address_number || null,
+        addressComplement: profile?.address_complement || null,
+        province: profile?.province || null,
+        city: profile?.city || null,
+        state: profile?.state || null,
         phone: profile?.phone || null,
       });
     }

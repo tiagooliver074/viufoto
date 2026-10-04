@@ -69,6 +69,14 @@ const TabCarteira = () => {
   const [cpfCnpj, setCpfCnpj] = useState("");
   const [phone, setPhone] = useState("");
   const [birthDate, setBirthDate] = useState("");
+  const [postalCode, setPostalCode] = useState("");
+  const [address, setAddress] = useState("");
+  const [addressNumber, setAddressNumber] = useState("");
+  const [addressComplement, setAddressComplement] = useState("");
+  const [province, setProvince] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [lookingUpCep, setLookingUpCep] = useState(false);
 
   // Wallet data
   const [balance, setBalance] = useState(0);
@@ -145,6 +153,13 @@ const TabCarteira = () => {
         if (wallet.name) setName(wallet.name);
         if (wallet.cpfCnpj) setCpfCnpj(wallet.cpfCnpj);
         if (wallet.phone) setPhone(wallet.phone);
+        if (wallet.postalCode) setPostalCode(wallet.postalCode);
+        if (wallet.address) setAddress(wallet.address);
+        if (wallet.addressNumber) setAddressNumber(wallet.addressNumber);
+        if (wallet.addressComplement) setAddressComplement(wallet.addressComplement);
+        if (wallet.province) setProvince(wallet.province);
+        if (wallet.city) setCity(wallet.city);
+        if (wallet.state) setState(wallet.state);
         setEmail(user?.email || "");
       }
 
@@ -162,6 +177,28 @@ const TabCarteira = () => {
     }
   };
 
+  const handleCepBlur = async () => {
+    const cleanCep = postalCode.replace(/\D/g, "");
+    if (cleanCep.length !== 8) return;
+    setLookingUpCep(true);
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      const data = await res.json();
+      if (data.erro) {
+        toast.error("CEP não encontrado.");
+        return;
+      }
+      if (data.logradouro) setAddress(data.logradouro);
+      if (data.bairro) setProvince(data.bairro);
+      if (data.localidade) setCity(data.localidade);
+      if (data.uf) setState(data.uf);
+    } catch {
+      // Falha na consulta não deve travar o preenchimento manual.
+    } finally {
+      setLookingUpCep(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!name.trim() || !cpfCnpj.trim() || !email.trim()) {
       toast.error("Preencha todos os campos obrigatórios");
@@ -171,9 +208,22 @@ const TabCarteira = () => {
       toast.error("Data de nascimento é obrigatória");
       return;
     }
+    if (!phone.trim()) {
+      toast.error("Telefone é obrigatório");
+      return;
+    }
     const cleanCpf = cpfCnpj.replace(/\D/g, "");
     if (cleanCpf.length !== 11 && cleanCpf.length !== 14) {
       toast.error("CPF ou CNPJ inválido");
+      return;
+    }
+    const cleanCep = postalCode.replace(/\D/g, "");
+    if (cleanCep.length !== 8) {
+      toast.error("Informe um CEP válido");
+      return;
+    }
+    if (!address.trim() || !addressNumber.trim() || !province.trim()) {
+      toast.error("Preencha o endereço completo (logradouro, número e bairro)");
       return;
     }
     setSaving(true);
@@ -184,8 +234,15 @@ const TabCarteira = () => {
           name: name.trim(),
           email: email.trim(),
           cpfCnpj: cleanCpf,
-          phone: phone.replace(/\D/g, "") || undefined,
+          phone: phone.replace(/\D/g, ""),
           birthDate: birthDate,
+          postalCode: cleanCep,
+          address: address.trim(),
+          addressNumber: addressNumber.trim(),
+          addressComplement: addressComplement.trim() || undefined,
+          province: province.trim(),
+          city: city.trim() || undefined,
+          state: state.trim() || undefined,
         },
       });
       if (error) {
@@ -397,7 +454,37 @@ const TabCarteira = () => {
           <InputField label="E-mail" value={email} onChange={setEmail} placeholder="seu@email.com" required disabled />
           <InputField label="CPF ou CNPJ" value={cpfCnpj} onChange={setCpfCnpj} placeholder="000.000.000-00" required />
           <InputField label="Data de nascimento" value={birthDate} onChange={setBirthDate} placeholder="1990-01-31" required type="date" />
-          <InputField label="Telefone" value={phone} onChange={setPhone} placeholder="(00) 00000-0000" />
+          <InputField label="Telefone" value={phone} onChange={setPhone} placeholder="(00) 00000-0000" required />
+        </div>
+
+        {/* Seção 1.1 — Endereço (exigido pela instituição financeira parceira) */}
+        <div className="glass-card p-6 space-y-0">
+          <div className="flex items-center gap-2 mb-4 pb-4 border-b border-border">
+            <Shield className="w-5 h-5 text-primary" />
+            <h3 className="font-semibold">Endereço</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] items-center gap-2 py-3 border-b border-border/50">
+            <label className="text-sm text-muted-foreground font-medium">
+              CEP <span className="text-destructive">*</span>
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                value={postalCode}
+                onChange={(e) => setPostalCode(e.target.value)}
+                onBlur={handleCepBlur}
+                placeholder="00000-000"
+                className="w-full bg-secondary/50 rounded-lg px-4 py-2.5 text-sm outline-none border border-border focus:border-primary transition-colors"
+              />
+              {lookingUpCep && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground absolute right-3 top-1/2 -translate-y-1/2" />}
+            </div>
+          </div>
+          <InputField label="Endereço (rua/av.)" value={address} onChange={setAddress} placeholder="Preenchido pelo CEP" required />
+          <InputField label="Número" value={addressNumber} onChange={setAddressNumber} placeholder="Ex: 123" required />
+          <InputField label="Complemento" value={addressComplement} onChange={setAddressComplement} placeholder="Apto, bloco... (opcional)" />
+          <InputField label="Bairro" value={province} onChange={setProvince} placeholder="Preenchido pelo CEP" required />
+          <InputField label="Cidade" value={city} onChange={setCity} placeholder="Preenchido pelo CEP" disabled />
+          <InputField label="Estado" value={state} onChange={setState} placeholder="Preenchido pelo CEP" disabled />
         </div>
 
         {/* Seção 2 — Segurança */}
