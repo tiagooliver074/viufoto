@@ -99,19 +99,44 @@ const TabConta = () => {
     if (!user) return;
     setSaving(true);
     try {
+      const cleanCpf = cpf.replace(/\D/g, "");
+      if (cleanCpf && cleanCpf.length !== 11 && cleanCpf.length !== 14) {
+        toast.error("CPF ou CNPJ inválido.");
+        setSaving(false);
+        return;
+      }
+      // Atualiza nome/telefone/CPF no perfil. CPF e data de nascimento só são
+      // enviados quando a carteira ainda não foi ativada (hasWallet=false);
+      // uma vez ativada, ambos ficam travados na UI e não chegam aqui.
+      const profileUpdate: Record<string, unknown> = { full_name: fullName, phone };
+      if (!hasWallet) profileUpdate.cpf_cnpj = cleanCpf || null;
       const { error } = await supabase
         .from("profiles")
-        .update({ full_name: fullName, phone })
+        .update(profileUpdate)
         .eq("user_id", user.id);
       if (error) throw error;
+
+      // Data de nascimento não tem coluna própria em "profiles" — fica em
+      // user_metadata (auth.users), por isso precisa de uma chamada separada.
+      if (!hasWallet && birthDate) {
+        const { error: metaError } = await supabase.auth.updateUser({
+          data: { birth_date: birthDate },
+        });
+        if (metaError) throw metaError;
+      }
+
       toast.success("Seus dados foram atualizados com sucesso.");
-      // Recarrega o timestamp para atualizar o cooldown imediatamente
+      // Recarrega timestamp (cooldown do nome) e o estado de "carteira ativada",
+      // já que salvar o CPF aqui também destrava/trava os mesmos campos.
       const { data: fresh } = await supabase
         .from("profiles")
-        .select("full_name_updated_at")
+        .select("full_name_updated_at, cpf_cnpj")
         .eq("user_id", user.id)
         .single();
-      if (fresh) setFullNameUpdatedAt((fresh as any).full_name_updated_at || null);
+      if (fresh) {
+        setFullNameUpdatedAt((fresh as any).full_name_updated_at || null);
+        setHasWallet(!!(fresh as any).cpf_cnpj);
+      }
     } catch (err: any) {
       toast.error(err.message || "Não foi possível salvar. Tente novamente.");
     } finally {
