@@ -31,6 +31,7 @@ import NotFound from "./pages/NotFound";
 import FotoPage from "./pages/FotoPage";
 import PhotographerPage from "./pages/PhotographerPage";
 import PhotographerPortfolioPage from "./pages/PhotographerPortfolioPage";
+import ColetivoPublicPage from "./pages/ColetivoPublicPage";
 import MeusPedidos from "./pages/MeusPedidos";
 import BuscarEventos from "./pages/BuscarEventos";
 import Favoritos from "./pages/Favoritos";
@@ -102,6 +103,7 @@ const AppRoutes = () => {
       <Route path="/foto/:photoId" element={<FotoPage />} />
       <Route path="/fotografo/:slug" element={<PhotographerPage />} />
       <Route path="/fotografo/:slug/portfolio" element={<PhotographerPortfolioPage />} />
+      <Route path="/coletivo/:slug" element={<ColetivoPublicPage />} />
       <Route path="/meus-pedidos" element={<MeusPedidos />} />
       <Route path="/favoritos" element={<Favoritos />} />
       <Route path="/buscar" element={<BuscarEventos />} />

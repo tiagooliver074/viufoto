@@ -6,9 +6,19 @@ import { useAuth } from "@/contexts/AuthContext";
 import DashboardSidebar from "@/components/DashboardSidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Users, PlusCircle, Check, X, Shield, Award, Mail, Send, Trash2, UserPlus, LogOut } from "lucide-react";
+import { Users, PlusCircle, Check, X, Shield, Award, Mail, Send, Trash2, UserPlus, LogOut, Wallet, AlertTriangle, Globe, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import * as Typography from "@/components/ui/Typography";
+import { normalizeSlug, validateSlug } from "@/lib/siteSlug";
+
+const INVITE_ERROR_MESSAGES: Record<string, string> = {
+  coletivo_not_found: "Coletivo não encontrado.",
+  not_owner: "Apenas o administrador do coletivo pode convidar.",
+  user_not_found: "Não encontramos nenhuma conta ViuFoto com esse e-mail.",
+  cannot_invite_self: "Você já é o administrador deste coletivo.",
+  already_member: "Este fotógrafo já é membro ativo do coletivo.",
+  already_invited: "Este fotógrafo já tem um convite pendente.",
+};
 
 const MeuColetivo = () => {
   const { user } = useAuth();
@@ -16,8 +26,30 @@ const MeuColetivo = () => {
   const [inviteEmail, setInviteEmail] = useState("");
   const [newColetivoName, setNewColetivoName] = useState("");
   const [isCreatingMode, setIsCreatingMode] = useState(false);
+  const [slugInput, setSlugInput] = useState("");
+  const [editingSlug, setEditingSlug] = useState(false);
+
+  // Carteira Asaas do próprio usuário — usada para saber se ele já pode
+  // receber a comissão do coletivo (ver Configurações > Carteira).
+  const { data: minhaCarteira } = useQuery({
+    queryKey: ["minha-carteira-wallet-id", user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("asaas_wallet_id")
+        .eq("user_id", user!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.asaas_wallet_id || null;
+    },
+    enabled: !!user?.id,
+  });
 
   // 1. Dados do Coletivo (Se sou dono)
+  // Observação: não existe FK entre coletivo_members.user_id e profiles,
+  // então o PostgREST não consegue resolver um embed aninhado
+  // (profile:profiles(full_name)) automaticamente — por isso buscamos os
+  // membros e os perfis em duas etapas e juntamos manualmente aqui.
   const { data: meuColetivo, isLoading: loadingColetivo } = useQuery({
     queryKey: ["meu-coletivo-dono", user?.id],
     queryFn: async () => {
@@ -25,17 +57,46 @@ const MeuColetivo = () => {
         .from("coletivos")
         .select(`
           *,
-          members:coletivo_members(
-            *,
-            profile:profiles(full_name)
-          )
+          members:coletivo_members(*)
         `)
         .eq("owner_id", user!.id)
         .maybeSingle();
       if (error) throw error;
+      if (!data) return data;
+
+      const members = (data as any).members || [];
+      const userIds = members.map((m: any) => m.user_id).filter(Boolean);
+      if (userIds.length > 0) {
+        const { data: profiles, error: profilesError } = await supabase
+          .from("profiles")
+          .select("user_id, full_name")
+          .in("user_id", userIds);
+        if (profilesError) throw profilesError;
+        const profileByUserId = new Map((profiles || []).map((p: any) => [p.user_id, p]));
+        (data as any).members = members.map((m: any) => ({
+          ...m,
+          profile: profileByUserId.get(m.user_id) || null,
+        }));
+      }
+
       return data;
     },
     enabled: !!user?.id,
+  });
+
+  // Mensagens recebidas via página pública do coletivo
+  const { data: leads = [] } = useQuery({
+    queryKey: ["coletivo-leads", meuColetivo?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("coletivo_leads" as any)
+        .select("*")
+        .eq("coletivo_id", meuColetivo!.id)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data || []) as any[];
+    },
+    enabled: !!meuColetivo?.id,
   });
 
   // 2. Coletivos onde sou membro
@@ -79,29 +140,14 @@ const MeuColetivo = () => {
 
   const convidarMembro = useMutation({
     mutationFn: async (email: string) => {
-      // Perfil público por email? Talvez não tenhamos acesso direto ao auth.users. 
-      // Usando uma busca aproximada pelo profiles se estiver exposto ou RPC.
-      // Por simplicidade na Etapa 1, vamos assumir busca direta no profiles.
-      const { data: profiles, error: pError } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("full_name", email.trim()) // Fallback se não tivermos email no profiles table
-        .maybeSingle();
-      
-      if (!profiles) throw new Error("Usuário não encontrado ou e-mail inválido");
-
-      const { error } = await supabase
-        .from("coletivo_members")
-        .insert({
-          coletivo_id: meuColetivo!.id,
-          user_id: profiles.id,
-          invited_by: user!.id,
-          status: "convidado"
-        });
-      
-      if (error) {
-        if (error.code === '23505') throw new Error("Este fotógrafo já foi convidado ou já é membro.");
-        throw error;
+      const { data, error } = await supabase.rpc("convidar_membro_coletivo", {
+        p_coletivo_id: meuColetivo!.id,
+        p_email: email.trim(),
+      });
+      if (error) throw error;
+      const result = data as { success: boolean; reason?: string };
+      if (!result.success) {
+        throw new Error(INVITE_ERROR_MESSAGES[result.reason || ""] || "Não foi possível enviar o convite.");
       }
     },
     onSuccess: () => {
@@ -110,6 +156,63 @@ const MeuColetivo = () => {
       setInviteEmail("");
     },
     onError: (err: any) => toast.error(err.message)
+  });
+
+  const removerMembro = useMutation({
+    mutationFn: async (memberId: string) => {
+      const { error } = await supabase
+        .from("coletivo_members")
+        .update({ status: "removido" })
+        .eq("id", memberId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["meu-coletivo-dono"] });
+      toast.success("Membro removido do coletivo.");
+    },
+    onError: (err: any) => toast.error("Erro ao remover membro: " + err.message),
+  });
+
+  const cancelarConvite = useMutation({
+    mutationFn: async (memberId: string) => {
+      const { error } = await supabase
+        .from("coletivo_members")
+        .delete()
+        .eq("id", memberId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["meu-coletivo-dono"] });
+      toast.success("Convite cancelado.");
+    },
+    onError: (err: any) => toast.error("Erro ao cancelar convite: " + err.message),
+  });
+
+  const salvarSlug = useMutation({
+    mutationFn: async (slug: string) => {
+      const s = normalizeSlug(slug);
+      const err = validateSlug(s);
+      if (err) throw new Error(err);
+      const { data: existing } = await supabase
+        .from("coletivos")
+        .select("id")
+        .eq("slug", s)
+        .neq("id", meuColetivo!.id)
+        .maybeSingle();
+      if (existing) throw new Error("Esse endereço já está em uso por outro coletivo.");
+      const { error } = await supabase
+        .from("coletivos")
+        .update({ slug: s })
+        .eq("id", meuColetivo!.id);
+      if (error) throw error;
+      return s;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["meu-coletivo-dono"] });
+      toast.success("Página pública ativada!");
+      setEditingSlug(false);
+    },
+    onError: (err: any) => toast.error(err.message),
   });
 
   const responderConvite = useMutation({
@@ -192,6 +295,76 @@ const MeuColetivo = () => {
               <div className="text-xs bg-primary/10 text-primary px-3 py-1 rounded-full font-bold uppercase tracking-wider">Administrador</div>
             </div>
 
+            {!minhaCarteira && (
+              <div className="glass-card p-4 flex items-start gap-3 border-l-4 border-l-amber-500">
+                <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-semibold text-foreground">Configure sua carteira para receber a comissão do coletivo</p>
+                  <p className="text-muted-foreground text-xs mt-0.5">
+                    Sem isso, a % definida para cada membro não é repassada a você nas vendas.{" "}
+                    <Link to="/dashboard/configuracoes?tab=carteira" className="text-primary font-medium hover:underline">
+                      Ativar recebimento
+                    </Link>
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="glass-card p-5">
+              <h3 className="font-bold text-sm flex items-center gap-2 mb-2"><Globe className="w-4 h-4 text-primary" /> Página pública</h3>
+              {meuColetivo.slug && !editingSlug ? (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <p className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Link2 className="w-3.5 h-3.5" />
+                    <a href={`/coletivo/${meuColetivo.slug}`} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                      viufoto.com/coletivo/{meuColetivo.slug}
+                    </a>
+                  </p>
+                  <Button variant="ghost" size="sm" onClick={() => { setSlugInput(meuColetivo.slug); setEditingSlug(true); }}>Alterar endereço</Button>
+                </div>
+              ) : (
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Input
+                    placeholder="endereco-do-coletivo"
+                    value={slugInput}
+                    onChange={(e) => setSlugInput(e.target.value)}
+                    className="flex-1 h-10 text-sm"
+                  />
+                  <Button size="sm" onClick={() => salvarSlug.mutate(slugInput)} disabled={salvarSlug.isPending || !slugInput}>
+                    {meuColetivo.slug ? "Salvar" : "Ativar página pública"}
+                  </Button>
+                  {meuColetivo.slug && (
+                    <Button variant="ghost" size="sm" onClick={() => setEditingSlug(false)}>Cancelar</Button>
+                  )}
+                </div>
+              )}
+              {!meuColetivo.slug && !editingSlug && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Crie uma página pública para divulgar o coletivo e os fotógrafos do grupo.
+                </p>
+              )}
+            </div>
+
+            {leads.length > 0 && (
+              <div className="glass-card overflow-hidden">
+                <header className="p-5 border-b border-border">
+                  <h3 className="font-bold flex items-center gap-2 text-sm"><Mail className="w-4 h-4 text-primary" /> Mensagens recebidas ({leads.length})</h3>
+                </header>
+                <div className="divide-y divide-border">
+                  {leads.map((lead) => (
+                    <div key={lead.id} className="p-4">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-sm font-semibold text-foreground">{lead.name}</p>
+                        <span className="text-[11px] text-muted-foreground">{new Date(lead.created_at).toLocaleDateString("pt-BR")}</span>
+                      </div>
+                      <a href={`mailto:${lead.email}`} className="text-xs text-primary hover:underline">{lead.email}</a>
+                      <p className="text-sm text-muted-foreground mt-2">{lead.message}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Membros */}
               <div className="lg:col-span-2 glass-card overflow-hidden">
@@ -218,11 +391,31 @@ const MeuColetivo = () => {
                             />
                           </div>
                           <div className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider ${
-                            m.status === 'ativo' ? 'bg-emerald-500/10 text-emerald-600' : 
+                            m.status === 'ativo' ? 'bg-emerald-500/10 text-emerald-600' :
                             m.status === 'convidado' ? 'bg-amber-500/10 text-amber-600' : 'bg-red-500/10 text-red-600'
                           }`}>
                             {m.status}
                           </div>
+                          {m.status === 'ativo' && (
+                            <Button
+                              variant="ghost" size="sm"
+                              onClick={() => removerMembro.mutate(m.id)}
+                              className="text-muted-foreground hover:text-red-500 h-8 w-8 p-0"
+                              title="Remover do coletivo"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                          {m.status === 'convidado' && (
+                            <Button
+                              variant="ghost" size="sm"
+                              onClick={() => cancelarConvite.mutate(m.id)}
+                              className="text-muted-foreground hover:text-red-500 h-8 w-8 p-0"
+                              title="Cancelar convite"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                     ))
@@ -234,12 +427,13 @@ const MeuColetivo = () => {
               <div className="glass-card p-5 space-y-4 h-fit">
                 <h3 className="font-bold text-sm flex items-center gap-2"><UserPlus className="w-4 h-4 text-primary" /> Convidar Fotógrafo</h3>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Digite o nome completo do fotógrafo que você deseja convidar. Ele precisa ter conta no ViuFoto.
+                  Digite o e-mail do fotógrafo que você deseja convidar. Ele precisa ter conta no ViuFoto.
                 </p>
                 <div className="space-y-3">
-                  <Input 
-                    placeholder="Nome Completo" 
-                    value={inviteEmail} 
+                  <Input
+                    type="email"
+                    placeholder="email@exemplo.com"
+                    value={inviteEmail}
                     onChange={e => setInviteEmail(e.target.value)}
                     className="h-10 text-sm"
                   />

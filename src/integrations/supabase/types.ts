@@ -445,6 +445,48 @@ export type Database = {
         }
         Relationships: []
       }
+      coletivo_leads: {
+        Row: {
+          coletivo_id: string
+          created_at: string
+          email: string
+          id: string
+          message: string
+          name: string
+        }
+        Insert: {
+          coletivo_id: string
+          created_at?: string
+          email: string
+          id?: string
+          message: string
+          name: string
+        }
+        Update: {
+          coletivo_id?: string
+          created_at?: string
+          email?: string
+          id?: string
+          message?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "coletivo_leads_coletivo_id_fkey"
+            columns: ["coletivo_id"]
+            isOneToOne: false
+            referencedRelation: "coletivos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coletivo_leads_coletivo_id_fkey"
+            columns: ["coletivo_id"]
+            isOneToOne: false
+            referencedRelation: "coletivos_publico"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       coletivo_members: {
         Row: {
           coletivo_id: string
@@ -482,6 +524,13 @@ export type Database = {
             columns: ["coletivo_id"]
             isOneToOne: false
             referencedRelation: "coletivos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "coletivo_members_coletivo_id_fkey"
+            columns: ["coletivo_id"]
+            isOneToOne: false
+            referencedRelation: "coletivos_publico"
             referencedColumns: ["id"]
           },
         ]
@@ -1326,6 +1375,13 @@ export type Database = {
             columns: ["coletivo_id"]
             isOneToOne: false
             referencedRelation: "coletivos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "events_coletivo_id_fkey"
+            columns: ["coletivo_id"]
+            isOneToOne: false
+            referencedRelation: "coletivos_publico"
             referencedColumns: ["id"]
           },
         ]
@@ -3598,6 +3654,33 @@ export type Database = {
       }
     }
     Views: {
+      coletivos_publico: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          description: string | null
+          id: string | null
+          name: string | null
+          slug: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          name?: string | null
+          slug?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          name?: string | null
+          slug?: string | null
+        }
+        Relationships: []
+      }
       photo_search_index: {
         Row: {
           bib_count: number | null
@@ -3778,6 +3861,10 @@ export type Database = {
         }[]
       }
       cleanup_old_logs: { Args: never; Returns: Json }
+      convidar_membro_coletivo: {
+        Args: { p_coletivo_id: string; p_email: string }
+        Returns: Json
+      }
       enqueue_event_backfill: {
         Args: { _event_id: string; _force?: boolean }
         Returns: {
