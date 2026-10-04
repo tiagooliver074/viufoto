@@ -29,18 +29,19 @@ const MeuColetivo = () => {
   const [slugInput, setSlugInput] = useState("");
   const [editingSlug, setEditingSlug] = useState(false);
 
-  // Carteira Asaas do próprio usuário — usada para saber se ele já pode
-  // receber a comissão do coletivo (ver Configurações > Carteira).
+  // Cadastro de recebimento do próprio usuário (saldo interno via wallet_ledger)
+  // — usado para saber se ele já pode receber a comissão do coletivo
+  // (ver Configurações > Carteira).
   const { data: minhaCarteira } = useQuery({
-    queryKey: ["minha-carteira-wallet-id", user?.id],
+    queryKey: ["minha-carteira-configurada", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("asaas_wallet_id")
+        .select("cpf_cnpj")
         .eq("user_id", user!.id)
         .maybeSingle();
       if (error) throw error;
-      return data?.asaas_wallet_id || null;
+      return data?.cpf_cnpj || null;
     },
     enabled: !!user?.id,
   });

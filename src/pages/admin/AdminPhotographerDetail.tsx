@@ -12,7 +12,7 @@ interface Profile {
   full_name: string | null;
   created_at: string;
   last_sign_in_at: string | null;
-  asaas_wallet_id: string | null;
+  cpf_cnpj: string | null;
 }
 
 interface EventRow {
@@ -57,7 +57,7 @@ const AdminPhotographerDetail = () => {
     const fetch = async () => {
       setLoading(true);
       const [{ data: prof }, { data: evs }, { data: photos }, { data: orders }] = await Promise.all([
-        supabase.from("profiles").select("user_id, full_name, created_at, last_sign_in_at, asaas_wallet_id").eq("user_id", id).maybeSingle(),
+        supabase.from("profiles").select("user_id, full_name, created_at, last_sign_in_at, cpf_cnpj").eq("user_id", id).maybeSingle(),
         supabase.from("events").select("id, name, event_date, plan_type").eq("organizer_id", id),
         supabase.from("event_photos").select("id, event_id"),
         supabase.from("orders").select("id, event_id, amount, status, created_at, payment_method").eq("status", "pago"),
@@ -290,7 +290,7 @@ const AdminPhotographerDetail = () => {
               <StatCard label="Receita Total" value={fmtCurrency(totals.revenue)} icon={DollarSign} />
               <StatCard label="Comissão Plataforma" value={fmtCurrency(platformCommission)} icon={DollarSign} />
               <StatCard label="Repasse" value={fmtCurrency(photographerPayout)} icon={DollarSign} />
-              <StatCard label="Recebimento Asaas" value={profile.asaas_wallet_id ? "Configurado" : "Pendente"} icon={DollarSign} />
+              <StatCard label="Recebimento" value={profile.cpf_cnpj ? "Configurado" : "Pendente"} icon={DollarSign} />
             </div>
             <div className="text-sm">
               <p className="text-xs text-muted-foreground mb-1">Saldo pendente</p>

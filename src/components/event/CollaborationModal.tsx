@@ -43,7 +43,7 @@ export default function CollaborationModal({ open, onClose, eventId, ownerCommis
       const ids = (rows || []).map(r => r.photographer_id);
       let profiles: any[] = [];
       if (ids.length) {
-        const { data: ps } = await supabase.from("profiles").select("user_id, full_name, avatar_url, asaas_wallet_id").in("user_id", ids);
+        const { data: ps } = await supabase.from("profiles").select("user_id, full_name, avatar_url, cpf_cnpj").in("user_id", ids);
         profiles = ps || [];
       }
       return (rows || []).map(r => ({ ...r, profile: profiles.find(p => p.user_id === r.photographer_id) }));
@@ -89,7 +89,7 @@ export default function CollaborationModal({ open, onClose, eventId, ownerCommis
       const ids = (roles || []).map(r => r.user_id);
       if (!ids.length) return [];
       const { data } = await supabase.from("profiles")
-        .select("user_id, full_name, avatar_url, asaas_wallet_id")
+        .select("user_id, full_name, avatar_url, cpf_cnpj")
         .in("user_id", ids)
         .ilike("full_name", `%${searchTerm}%`)
         .limit(8);
@@ -296,7 +296,7 @@ export default function CollaborationModal({ open, onClose, eventId, ownerCommis
                     <p className="text-center text-xs text-muted-foreground p-4">Nenhum fotógrafo encontrado</p>
                   )}
                   {(searchQ.data || []).map(p => {
-                    const ready = !!p.asaas_wallet_id;
+                    const ready = !!p.cpf_cnpj;
                     return (
                       <div key={p.user_id} className="flex items-center justify-between p-3 hover:bg-muted/40 border-b last:border-0">
                         <div className="flex items-center gap-2 min-w-0">

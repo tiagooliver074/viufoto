@@ -43,19 +43,56 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Update order status to "pago"
-      const { error } = await supabaseAdmin
+      // Marca o pedido como pago e "reivindica" o crédito no ledger atomicamente:
+      // o filtro ledger_credited=false garante que, se a Asaas reenviar o webhook
+      // (comum em caso de timeout), só a primeira chamada credita o fotógrafo/coletivo.
+      const { data: claimedOrder, error } = await supabaseAdmin
         .from("orders")
         .update({
           status: "pago",
           asaas_payment_id: asaasPaymentId,
+          ledger_credited: true,
         })
-        .eq("id", externalReference);
+        .eq("id", externalReference)
+        .eq("ledger_credited", false)
+        .select("id, organizer_id, platform_fee, collective_owner_id, collective_fee, photographer_net")
+        .maybeSingle();
 
       if (error) {
         console.error("Error updating order:", error);
+      } else if (claimedOrder) {
+        console.log(`Order ${externalReference} marked as paid, crediting wallet_ledger`);
+
+        const ledgerEntries: Array<Record<string, unknown>> = [];
+
+        if (claimedOrder.organizer_id && Number(claimedOrder.photographer_net) > 0) {
+          ledgerEntries.push({
+            user_id: claimedOrder.organizer_id,
+            order_id: claimedOrder.id,
+            type: "credit_sale",
+            amount: claimedOrder.photographer_net,
+            description: `Venda - pedido ${claimedOrder.id}`,
+          });
+        }
+
+        if (claimedOrder.collective_owner_id && Number(claimedOrder.collective_fee) > 0) {
+          ledgerEntries.push({
+            user_id: claimedOrder.collective_owner_id,
+            order_id: claimedOrder.id,
+            type: "credit_sale_collective",
+            amount: claimedOrder.collective_fee,
+            description: `Comissão de coletivo - pedido ${claimedOrder.id}`,
+          });
+        }
+
+        if (ledgerEntries.length > 0) {
+          const { error: ledgerError } = await supabaseAdmin.from("wallet_ledger").insert(ledgerEntries);
+          if (ledgerError) {
+            console.error("Error crediting wallet_ledger:", ledgerError);
+          }
+        }
       } else {
-        console.log(`Order ${externalReference} marked as paid`);
+        console.log(`Order ${externalReference} already credited (duplicate webhook), skipping ledger insert`);
       }
     }
 

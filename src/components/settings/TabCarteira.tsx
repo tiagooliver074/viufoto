@@ -60,23 +60,12 @@ const TabCarteira = () => {
   const [saving, setSaving] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
   const [configured, setConfigured] = useState(false);
-  const [walletId, setWalletId] = useState<string | null>(null);
   const [visible, setVisible] = useState(true);
 
   // Onboarding form
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
   const [cpfCnpj, setCpfCnpj] = useState("");
   const [phone, setPhone] = useState("");
-  const [birthDate, setBirthDate] = useState("");
-  const [postalCode, setPostalCode] = useState("");
-  const [address, setAddress] = useState("");
-  const [addressNumber, setAddressNumber] = useState("");
-  const [addressComplement, setAddressComplement] = useState("");
-  const [province, setProvince] = useState("");
-  const [city, setCity] = useState("");
-  const [state, setState] = useState("");
-  const [lookingUpCep, setLookingUpCep] = useState(false);
 
   // Wallet data
   const [balance, setBalance] = useState(0);
@@ -149,18 +138,9 @@ const TabCarteira = () => {
       const wallet = walletRes.data;
       if (wallet) {
         setConfigured(wallet.configured);
-        setWalletId(wallet.walletId);
         if (wallet.name) setName(wallet.name);
         if (wallet.cpfCnpj) setCpfCnpj(wallet.cpfCnpj);
         if (wallet.phone) setPhone(wallet.phone);
-        if (wallet.postalCode) setPostalCode(wallet.postalCode);
-        if (wallet.address) setAddress(wallet.address);
-        if (wallet.addressNumber) setAddressNumber(wallet.addressNumber);
-        if (wallet.addressComplement) setAddressComplement(wallet.addressComplement);
-        if (wallet.province) setProvince(wallet.province);
-        if (wallet.city) setCity(wallet.city);
-        if (wallet.state) setState(wallet.state);
-        setEmail(user?.email || "");
       }
 
       if (balanceRes.data) {
@@ -177,35 +157,9 @@ const TabCarteira = () => {
     }
   };
 
-  const handleCepBlur = async () => {
-    const cleanCep = postalCode.replace(/\D/g, "");
-    if (cleanCep.length !== 8) return;
-    setLookingUpCep(true);
-    try {
-      const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
-      const data = await res.json();
-      if (data.erro) {
-        toast.error("CEP não encontrado.");
-        return;
-      }
-      if (data.logradouro) setAddress(data.logradouro);
-      if (data.bairro) setProvince(data.bairro);
-      if (data.localidade) setCity(data.localidade);
-      if (data.uf) setState(data.uf);
-    } catch {
-      // Falha na consulta não deve travar o preenchimento manual.
-    } finally {
-      setLookingUpCep(false);
-    }
-  };
-
   const handleSave = async () => {
-    if (!name.trim() || !cpfCnpj.trim() || !email.trim()) {
+    if (!name.trim() || !cpfCnpj.trim()) {
       toast.error("Preencha todos os campos obrigatórios");
-      return;
-    }
-    if (!birthDate) {
-      toast.error("Data de nascimento é obrigatória");
       return;
     }
     if (!phone.trim()) {
@@ -217,45 +171,26 @@ const TabCarteira = () => {
       toast.error("CPF ou CNPJ inválido");
       return;
     }
-    const cleanCep = postalCode.replace(/\D/g, "");
-    if (cleanCep.length !== 8) {
-      toast.error("Informe um CEP válido");
-      return;
-    }
-    if (!address.trim() || !addressNumber.trim() || !province.trim()) {
-      toast.error("Preencha o endereço completo (logradouro, número e bairro)");
-      return;
-    }
     setSaving(true);
     try {
       const { data, error } = await supabase.functions.invoke("asaas-wallet", {
         body: {
           action: "create_wallet",
           name: name.trim(),
-          email: email.trim(),
           cpfCnpj: cleanCpf,
           phone: phone.replace(/\D/g, ""),
-          birthDate: birthDate,
-          postalCode: cleanCep,
-          address: address.trim(),
-          addressNumber: addressNumber.trim(),
-          addressComplement: addressComplement.trim() || undefined,
-          province: province.trim(),
-          city: city.trim() || undefined,
-          state: state.trim() || undefined,
         },
       });
       if (error) {
         // Try to extract message from edge function response
-        const msg = typeof error === "object" && error.message ? error.message : "Erro ao configurar recebimento";
+        const msg = typeof error === "object" && error.message ? error.message : "Erro ao salvar dados";
         throw new Error(msg);
       }
       if (data?.error) throw new Error(data.error);
       setConfigured(true);
-      setWalletId(data.walletId);
-      toast.success("Recebimento ativado com sucesso! 🎉");
+      toast.success("Dados salvos! Agora cadastre uma chave PIX para receber. 🎉");
     } catch (err: any) {
-      toast.error(err.message || "Erro ao configurar recebimento");
+      toast.error(err.message || "Erro ao salvar dados");
     } finally {
       setSaving(false);
     }
@@ -444,62 +379,31 @@ const TabCarteira = () => {
           </div>
         </div>
 
-        {/* Seção 1 — Dados necessários */}
+        {/* Dados necessários */}
         <div className="glass-card p-6 space-y-0">
           <div className="flex items-center gap-2 mb-4 pb-4 border-b border-border">
             <UserIcon className="w-5 h-5 text-primary" />
             <h3 className="font-semibold">Dados necessários</h3>
           </div>
           <InputField label="Nome completo" value={name} onChange={setName} placeholder="Seu nome completo" required />
-          <InputField label="E-mail" value={email} onChange={setEmail} placeholder="seu@email.com" required disabled />
           <InputField label="CPF ou CNPJ" value={cpfCnpj} onChange={setCpfCnpj} placeholder="000.000.000-00" required />
-          <InputField label="Data de nascimento" value={birthDate} onChange={setBirthDate} placeholder="1990-01-31" required type="date" />
           <InputField label="Telefone" value={phone} onChange={setPhone} placeholder="(00) 00000-0000" required />
         </div>
 
-        {/* Seção 1.1 — Endereço (exigido pela instituição financeira parceira) */}
-        <div className="glass-card p-6 space-y-0">
-          <div className="flex items-center gap-2 mb-4 pb-4 border-b border-border">
-            <Shield className="w-5 h-5 text-primary" />
-            <h3 className="font-semibold">Endereço</h3>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] items-center gap-2 py-3 border-b border-border/50">
-            <label className="text-sm text-muted-foreground font-medium">
-              CEP <span className="text-destructive">*</span>
-            </label>
-            <div className="relative">
-              <input
-                type="text"
-                value={postalCode}
-                onChange={(e) => setPostalCode(e.target.value)}
-                onBlur={handleCepBlur}
-                placeholder="00000-000"
-                className="w-full bg-secondary/50 rounded-lg px-4 py-2.5 text-sm outline-none border border-border focus:border-primary transition-colors"
-              />
-              {lookingUpCep && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground absolute right-3 top-1/2 -translate-y-1/2" />}
-            </div>
-          </div>
-          <InputField label="Endereço (rua/av.)" value={address} onChange={setAddress} placeholder="Preenchido pelo CEP" required />
-          <InputField label="Número" value={addressNumber} onChange={setAddressNumber} placeholder="Ex: 123" required />
-          <InputField label="Complemento" value={addressComplement} onChange={setAddressComplement} placeholder="Apto, bloco... (opcional)" />
-          <InputField label="Bairro" value={province} onChange={setProvince} placeholder="Preenchido pelo CEP" required />
-          <InputField label="Cidade" value={city} onChange={setCity} placeholder="Preenchido pelo CEP" disabled />
-          <InputField label="Estado" value={state} onChange={setState} placeholder="Preenchido pelo CEP" disabled />
-        </div>
-
-        {/* Seção 2 — Segurança */}
+        {/* Segurança */}
         <div className="glass-card p-4 flex items-start gap-3">
           <Shield className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
           <p className="text-xs text-muted-foreground">
-            Seus dados são utilizados para validar sua conta de recebimento com segurança através de uma instituição financeira parceira.
-            Após a ativação, você poderá cadastrar suas contas de saque (PIX ou conta bancária) e começar a receber.
+            Seus dados são usados apenas para confirmar a titularidade na hora do saque.
+            Após salvar, você poderá cadastrar uma chave PIX e começar a receber — o valor de cada venda fica guardado
+            no seu saldo interno e pode ser sacado via PIX a qualquer momento.
           </p>
         </div>
 
         <button onClick={handleSave} disabled={saving}
           className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-primary text-primary-foreground font-bold text-base hover:bg-primary/90 transition-all flex items-center justify-center gap-2 disabled:opacity-50 hover:shadow-[0_0_20px_hsl(var(--primary)/0.3)]">
           {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <ArrowRight className="w-5 h-5" />}
-          {saving ? "Ativando recebimento..." : "Ativar recebimento"}
+          {saving ? "Salvando..." : "Ativar recebimento"}
         </button>
       </div>
     );

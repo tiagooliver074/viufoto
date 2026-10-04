@@ -46,10 +46,16 @@ async function asaasFetch(path: string, options: RequestInit = {}) {
 async function getProfile(supabaseAdmin: any, userId: string) {
   const { data } = await supabaseAdmin
     .from("profiles")
-    .select("asaas_wallet_id, full_name, cpf_cnpj, phone, postal_code, address, address_number, address_complement, province, city, state")
+    .select("full_name, cpf_cnpj, phone")
     .eq("user_id", userId)
     .single();
   return data;
+}
+
+async function getWalletBalance(supabaseAdmin: any, userId: string): Promise<number> {
+  const { data, error } = await supabaseAdmin.rpc("get_wallet_balance", { p_user_id: userId });
+  if (error) throw new Error(error.message);
+  return Number(data) || 0;
 }
 
 function generate6DigitCode(): string {
@@ -129,131 +135,43 @@ Deno.serve(async (req) => {
     const ipAddress = req.headers.get("x-forwarded-for") || req.headers.get("cf-connecting-ip") || "unknown";
     const userAgent = req.headers.get("user-agent") || "unknown";
 
-    // ─── CREATE WALLET ───
+    // ─── CREATE WALLET (modelo conta mestre: apenas salva dados cadastrais) ───
+    // Não cria mais subconta na Asaas (produto restrito a CNPJ). O recebimento
+    // em si é feito via saldo interno (wallet_ledger) + saque por PIX.
     if (action === "create_wallet") {
-      const { name, email, cpfCnpj, phone, birthDate, postalCode, address, addressNumber, addressComplement, province, city, state } = params;
-      if (!name || !email || !cpfCnpj) return json({ error: "Nome, e-mail e CPF/CNPJ são obrigatórios" });
-      // A Asaas exige telefone celular e endereço completo para criar a conta de recebimento.
-      if (!phone) return json({ error: "Telefone é obrigatório" });
-      if (!postalCode) return json({ error: "É necessário informar o CEP." });
-      if (!address) return json({ error: "É necessário informar o endereço (logradouro)." });
-      if (!addressNumber) return json({ error: "É necessário informar o número do endereço." });
-      if (!province) return json({ error: "É necessário informar o bairro." });
-
-      const profile = await getProfile(supabaseAdmin, user.id);
-      if (profile?.asaas_wallet_id) return json({ walletId: profile.asaas_wallet_id, message: "Carteira já configurada" });
+      const { name, cpfCnpj, phone } = params;
+      if (!name || !cpfCnpj) return json({ error: "Nome e CPF/CNPJ são obrigatórios" });
 
       const cleanCpfCnpj = cpfCnpj.replace(/\D/g, "");
-      const cleanPostalCode = postalCode.replace(/\D/g, "");
-      if (cleanPostalCode.length !== 8) return json({ error: "CEP inválido." });
-
-      // Parse birthDate to YYYY-MM-DD (Asaas required format)
-      let formattedBirthDate: string | null = null;
-      if (birthDate) {
-        // Handle DD/MM/YYYY or DD-MM-YYYY
-        const dmy = birthDate.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-        if (dmy) {
-          formattedBirthDate = `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
-        }
-        // Handle YYYY-MM-DD (already correct)
-        else if (/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) {
-          formattedBirthDate = birthDate;
-        }
-        else {
-          return json({ error: "Data de nascimento em formato inválido. Use DD/MM/AAAA ou AAAA-MM-DD." });
-        }
-      }
-
-      const cleanPhone = phone.replace(/\D/g, "");
-
-      const accountData: Record<string, unknown> = {
-        name, email, cpfCnpj: cleanCpfCnpj,
-        companyType: cleanCpfCnpj.length > 11 ? "LIMITED" : "MEI",
-        loginEmail: email,
-        incomeValue: 5000,
-        phone: cleanPhone,
-        mobilePhone: cleanPhone,
-        postalCode: cleanPostalCode,
-        address,
-        addressNumber,
-        province,
-        ...(addressComplement ? { complement: addressComplement } : {}),
-        ...(formattedBirthDate ? { birthDate: formattedBirthDate } : {}),
-      };
-
-      console.log("Creating Asaas account with data:", JSON.stringify({ ...accountData, cpfCnpj: "***" }));
-
-      let walletId: string;
-
-      try {
-        const account = await asaasFetch("/accounts", { method: "POST", body: JSON.stringify(accountData) });
-        walletId = account.walletId || account.id;
-      } catch (createError: any) {
-        const errMsg = (createError.message || "").toLowerCase();
-        const isEmailDuplicate = errMsg.includes("email") && errMsg.includes("já está em uso");
-        const isCpfDuplicate = errMsg.includes("cpf") && errMsg.includes("já está em uso");
-        const isDuplicate = isEmailDuplicate || isCpfDuplicate || errMsg.includes("already") || errMsg.includes("duplicat");
-
-        if (!isDuplicate) throw createError;
-
-        // Account exists outside our scope — retry with unique loginEmail
-        console.log("Account already exists externally. Retrying with unique loginEmail...");
-
-        const uniqueEmail = email.replace("@", `+viufoto_${user.id.substring(0, 8)}@`);
-        const retryData = {
-          ...accountData,
-          loginEmail: uniqueEmail,
-          ...(isEmailDuplicate ? { email: uniqueEmail } : {}),
-        };
-
-        try {
-          const account = await asaasFetch("/accounts", { method: "POST", body: JSON.stringify(retryData) });
-          walletId = account.walletId || account.id;
-          console.log("Created account with unique email, walletId:", walletId);
-        } catch (retryError: any) {
-          console.error("Retry also failed:", retryError.message);
-          return json({ error: retryError.message || "Não foi possível criar sua conta de recebimento. Entre em contato com o suporte." });
-        }
+      if (cleanCpfCnpj.length !== 11 && cleanCpfCnpj.length !== 14) {
+        return json({ error: "CPF/CNPJ inválido." });
       }
 
       await supabaseAdmin.from("profiles")
-        .update({
-          asaas_wallet_id: walletId, full_name: name, cpf_cnpj: cpfCnpj, phone: phone || null,
-          postal_code: cleanPostalCode, address, address_number: addressNumber,
-          address_complement: addressComplement || null, province,
-          city: city || null, state: state || null,
-        })
+        .update({ full_name: name, cpf_cnpj: cpfCnpj, phone: phone || null })
         .eq("user_id", user.id);
 
-      return json({ walletId, message: "Recebimento configurado com sucesso!" });
+      return json({ message: "Dados salvos! Agora cadastre uma chave PIX para receber." });
     }
 
     // ─── CHECK WALLET ───
     if (action === "check_wallet") {
       const profile = await getProfile(supabaseAdmin, user.id);
       return json({
-        configured: !!profile?.asaas_wallet_id,
-        walletId: profile?.asaas_wallet_id || null,
+        configured: !!profile?.cpf_cnpj,
         name: profile?.full_name || null,
         cpfCnpj: profile?.cpf_cnpj || null,
-        postalCode: profile?.postal_code || null,
-        address: profile?.address || null,
-        addressNumber: profile?.address_number || null,
-        addressComplement: profile?.address_complement || null,
-        province: profile?.province || null,
-        city: profile?.city || null,
-        state: profile?.state || null,
         phone: profile?.phone || null,
       });
     }
 
-    // ─── GET BALANCE ───
+    // ─── GET BALANCE (saldo interno, não depende de conta Asaas) ───
     if (action === "get_balance") {
       const profile = await getProfile(supabaseAdmin, user.id);
-      if (!profile?.asaas_wallet_id) return json({ balance: 0, pending: 0, configured: false });
+      if (!profile?.cpf_cnpj) return json({ balance: 0, pending: 0, configured: false });
       try {
-        const balanceData = await asaasFetch(`/finance/balance`);
-        return json({ balance: balanceData?.balance ?? 0, pending: balanceData?.statistics?.pending ?? 0, configured: true });
+        const balance = await getWalletBalance(supabaseAdmin, user.id);
+        return json({ balance, pending: 0, configured: true });
       } catch (e: any) {
         return json({ balance: 0, pending: 0, configured: true, error: e.message });
       }
@@ -545,7 +463,7 @@ Deno.serve(async (req) => {
 
       // Titularity check
       const profile = await getProfile(supabaseAdmin, user.id);
-      if (!profile?.asaas_wallet_id) return json({ error: "Carteira não configurada." });
+      if (!profile?.cpf_cnpj) return json({ error: "Configure seus dados cadastrais antes de sacar." });
 
       const profileCpf = profile.cpf_cnpj?.replace(/\D/g, "") || "";
       const accountCpf = account.cpf_cnpj?.replace(/\D/g, "") || "";
@@ -558,11 +476,10 @@ Deno.serve(async (req) => {
         return json({ error: "CPF/CNPJ da conta de destino não corresponde ao seu cadastro." });
       }
 
-      // Check balance
+      // Check balance (saldo interno via wallet_ledger)
       let currentBalance = 0;
       try {
-        const balanceData = await asaasFetch(`/finance/balance`);
-        currentBalance = balanceData?.balance ?? 0;
+        currentBalance = await getWalletBalance(supabaseAdmin, user.id);
       } catch {
         return json({ error: "Erro ao verificar saldo." }, 500);
       }
@@ -601,6 +518,15 @@ Deno.serve(async (req) => {
           await supabaseAdmin.from("withdrawal_logs")
             .update({ status: "completed", asaas_transfer_id: transfer.id, completed_at: new Date().toISOString() })
             .eq("id", logEntry.id);
+
+          // Debita o saque do saldo interno
+          await supabaseAdmin.from("wallet_ledger").insert({
+            user_id: user.id,
+            withdrawal_log_id: logEntry.id,
+            type: "debit_withdrawal",
+            amount: -amount,
+            description: `Saque PIX - transferência ${transfer.id}`,
+          });
         }
 
         if (account.status === "pending") {

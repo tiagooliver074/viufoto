@@ -181,7 +181,7 @@ const Dashboard = () => {
   const isLoading = eventsLoading;
 
   /* ── wallet status ── */
-  const walletConfigured = !!profile?.asaas_wallet_id;
+  const walletConfigured = !!profile?.cpf_cnpj;
 
   return (
     <div className="flex min-h-screen bg-background">

@@ -73,14 +73,17 @@ const TabConta = () => {
     const loadProfile = async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("full_name, phone, cpf_cnpj, asaas_wallet_id, avatar_url, full_name_updated_at")
+        .select("full_name, phone, cpf_cnpj, avatar_url, full_name_updated_at")
         .eq("user_id", user.id)
         .single();
       if (data) {
         setFullName(data.full_name || "");
         setPhone(data.phone || "");
         setCpf(data.cpf_cnpj || "");
-        setHasWallet(!!data.asaas_wallet_id);
+        // CPF/data de nascimento travam assim que o recebimento é configurado
+        // (cpf_cnpj preenchido), já que o saldo interno/saque usam esse CPF
+        // para conferência de titularidade.
+        setHasWallet(!!data.cpf_cnpj);
         setAvatarUrl(data.avatar_url || null);
         setFullNameUpdatedAt((data as any).full_name_updated_at || null);
       }

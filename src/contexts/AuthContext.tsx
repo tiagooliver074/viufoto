@@ -9,7 +9,7 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  profile: { full_name: string | null; avatar_url: string | null; asaas_wallet_id: string | null; terms_accepted_at: string | null } | null;
+  profile: { full_name: string | null; avatar_url: string | null; cpf_cnpj: string | null; terms_accepted_at: string | null } | null;
   roles: AppRole[];
   hasRole: (role: AppRole) => boolean;
   addRole: (role: AppRole) => Promise<void>;
@@ -35,12 +35,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<{ full_name: string | null; avatar_url: string | null; asaas_wallet_id: string | null; terms_accepted_at: string | null } | null>(null);
+  const [profile, setProfile] = useState<{ full_name: string | null; avatar_url: string | null; cpf_cnpj: string | null; terms_accepted_at: string | null } | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
 
   const fetchUserData = async (userId: string) => {
     const [profileRes, rolesRes] = await Promise.all([
-      supabase.from("profiles").select("full_name, avatar_url, asaas_wallet_id, terms_accepted_at").eq("user_id", userId).single(),
+      supabase.from("profiles").select("full_name, avatar_url, cpf_cnpj, terms_accepted_at").eq("user_id", userId).single(),
       supabase.from("user_roles").select("role").eq("user_id", userId),
     ]);
     setProfile(profileRes.data);
@@ -98,7 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return;
     const { data } = await supabase
       .from("profiles")
-      .select("full_name, avatar_url, asaas_wallet_id, terms_accepted_at")
+      .select("full_name, avatar_url, cpf_cnpj, terms_accepted_at")
       .eq("user_id", user.id)
       .single();
     if (data) setProfile(data);

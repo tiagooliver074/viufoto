@@ -43,12 +43,6 @@ function getAsaasKey(): string {
   return key;
 }
 
-function getViufotoWalletId(): string {
-  const id = Deno.env.get("VIUFOTO_WALLET_ID");
-  if (!id) throw new Error("VIUFOTO_WALLET_ID not configured");
-  return id;
-}
-
 function getSupabaseAdmin() {
   return createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -81,14 +75,6 @@ async function asaasFetch(path: string, options: RequestInit = {}) {
 function mapErrorToFriendly(error: any): { status: number; code: string; message: string } {
   const raw = String(error?.message || "").toLowerCase();
 
-  if (raw.includes("split para sua própria carteira") || raw.includes("split para sua propria carteira")) {
-    console.error(`[WALLET_CONFLICT] Erro de split detectado. Mensagem original: "${error.message}"`);
-    return {
-      status: 400,
-      code: "WALLET_CONFLICT",
-      message: "Este evento ainda não está pronto para receber pagamentos. Avise o organizador para concluir a configuração.",
-    };
-  }
   if (raw.includes("cpfcnpj") || raw.includes("cpf") || raw.includes("cnpj inválido") || raw.includes("documento")) {
     return { status: 400, code: "INVALID_CPF", message: "CPF ou CNPJ inválido. Confira os números e tente novamente." };
   }
@@ -104,7 +90,7 @@ function mapErrorToFriendly(error: any): { status: number; code: string; message
   if (raw.includes("customer")) {
     return { status: 400, code: "INVALID_CUSTOMER", message: "Não conseguimos validar seus dados. Confira nome, e-mail e CPF." };
   }
-  if (raw.includes("asaas_api_key") || raw.includes("viufoto_wallet_id")) {
+  if (raw.includes("asaas_api_key")) {
     return { status: 500, code: "CONFIG_MISSING", message: "Pagamento temporariamente indisponível. Já fomos avisados." };
   }
   if (raw.includes("asaas error 5") || raw.includes("timeout") || raw.includes("network")) {
@@ -134,13 +120,15 @@ async function getOrCreateCustomer(name: string, email: string, cpfCnpj: string)
   });
 }
 
-async function createPixPaymentWithSplit(
+async function createPixPayment(
   customerId: string,
   value: number,
   description: string,
   externalReference: string,
-  split: Array<{ walletId: string; fixedValue?: number; percentualValue?: number; remainingValue?: boolean }>
 ) {
+  // Modelo de conta mestre: o pagamento inteiro entra na conta ASAAS da ViuFoto.
+  // Nenhum split é enviado — a divisão entre plataforma, coletivo e fotógrafo
+  // é controlada internamente via wallet_ledger (ver asaas-webhook).
   const today = new Date().toISOString().split("T")[0];
   const body: Record<string, unknown> = {
     customer: customerId,
@@ -150,9 +138,6 @@ async function createPixPaymentWithSplit(
     description,
     externalReference,
   };
-  if (split.length > 0) {
-    body.split = split;
-  }
   return await asaasFetch("/payments", {
     method: "POST",
     body: JSON.stringify(body),
@@ -196,33 +181,20 @@ Deno.serve(async (req) => {
         throw new Error("Evento não encontrado");
       }
 
-      // 2. Get photographer's wallet ID
-      const { data: profile } = await supabaseAdmin
-        .from("profiles")
-        .select("asaas_wallet_id")
-        .eq("user_id", event.organizer_id)
-        .single();
-
-      if (!profile?.asaas_wallet_id) {
-        return new Response(JSON.stringify({
-          error: "Este fotógrafo ainda não configurou recebimento. Entre em contato com o organizador do evento."
-        }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      // 3. Calculate split (Platform, Collective, Photographer)
+      // 2. Calculate internal split (Platform, Collective, Photographer).
+      // Nada disso é enviado à Asaas — o pagamento inteiro cai na conta mestre
+      // da ViuFoto e os valores abaixo viram créditos no wallet_ledger quando
+      // o webhook confirmar o pagamento (ver asaas-webhook).
       const commissionRate = await getCommissionRate(supabaseAdmin, event.plan_type);
       const platformFee = Math.round(total * commissionRate * 100) / 100;
-      
-      let collectiveFee = 0;
-      let collectiveWalletId = null;
 
-      // Handle Collective Split if event belongs to one
+      let collectiveFee = 0;
+      let collectiveOwnerId: string | null = null;
+
       if (event.coletivo_id) {
         const { data: coletivo } = await supabaseAdmin
           .from("coletivos")
-          .select("owner_asaas_wallet_id, owner_id")
+          .select("owner_id")
           .eq("id", event.coletivo_id)
           .single();
 
@@ -234,60 +206,27 @@ Deno.serve(async (req) => {
           .eq("status", "ativo")
           .single();
 
-        if (coletivo?.owner_asaas_wallet_id && member?.commission_pct) {
-          // Calculation: total * (commission_pct / 100)
+        if (coletivo?.owner_id && member?.commission_pct) {
           collectiveFee = Math.round(total * (Number(member.commission_pct) / 100) * 100) / 100;
-          collectiveWalletId = coletivo.owner_asaas_wallet_id;
-          
-          // If the photographer IS the collective owner, we don't split to themselves
+          collectiveOwnerId = coletivo.owner_id;
+
+          // Se o fotógrafo É o dono do coletivo, não faz sentido creditar a si mesmo separadamente
           if (coletivo.owner_id === event.organizer_id) {
             collectiveFee = 0;
-            collectiveWalletId = null;
+            collectiveOwnerId = null;
           }
         }
       }
 
-      const viufotoWalletId = getViufotoWalletId();
-      const normalize = (s: string | null | undefined) => (s || "").trim().toLowerCase();
-      
-      const split = [];
-      
-      // Platform Split
-      const isPlatformSameAsPhotographer = normalize(profile.asaas_wallet_id) === normalize(viufotoWalletId);
-      if (!isPlatformSameAsPhotographer) {
-        split.push({ walletId: viufotoWalletId, fixedValue: platformFee });
-      }
+      const photographerNet = Math.max(0, Math.round((total - platformFee - collectiveFee) * 100) / 100);
 
-      // Collective Split
-      if (collectiveWalletId && collectiveFee > 0) {
-        const isCollectiveSameAsPhotographer = normalize(profile.asaas_wallet_id) === normalize(collectiveWalletId);
-        const isCollectiveSameAsPlatform = normalize(collectiveWalletId) === normalize(viufotoWalletId);
+      console.log(`[DEBUG_LEDGER] Event=${eventId}, Coletivo=${event.coletivo_id}, organizer=${event.organizer_id}`);
+      console.log(`[DEBUG_LEDGER] Fees: platform=${platformFee}, coletivo=${collectiveFee}, photographerNet=${photographerNet}`);
 
-        if (isCollectiveSameAsPlatform) {
-          // Combine collective fee into platform split if already added
-          const platIndex = split.findIndex(s => normalize(s.walletId) === normalize(viufotoWalletId));
-          if (platIndex !== -1) {
-            split[platIndex].fixedValue = (split[platIndex].fixedValue || 0) + collectiveFee;
-          } else {
-            split.push({ walletId: viufotoWalletId, fixedValue: collectiveFee });
-          }
-        } else if (!isCollectiveSameAsPhotographer) {
-          split.push({ walletId: collectiveWalletId, fixedValue: collectiveFee });
-        }
-      }
-
-      // Remaining goes to Photographer
-      split.push({ walletId: profile.asaas_wallet_id, remainingValue: true });
-
-      console.log(`[DEBUG_PAYLOAD] Event=${eventId}, Coletivo=${event.coletivo_id}`);
-      console.log(`[DEBUG_PAYLOAD] Wallets: platform="${viufotoWalletId}", coletivo="${collectiveWalletId}", photographer="${profile.asaas_wallet_id}"`);
-      console.log(`[DEBUG_PAYLOAD] Fees: platform=${platformFee}, coletivo=${collectiveFee}`);
-      console.log(`[DEBUG_PAYLOAD] Split: ${JSON.stringify(split)}`);
-
-      // 4. Create/find ASAAS customer
+      // 3. Create/find ASAAS customer
       const customer = await getOrCreateCustomer(name, email, cpfCnpj.replace(/\D/g, ""));
 
-      // 5. Create order in database
+      // 4. Create order in database (já com os valores que o webhook vai creditar no ledger)
       const { data: order, error: orderError } = await supabaseAdmin
         .from("orders")
         .insert({
@@ -298,6 +237,11 @@ Deno.serve(async (req) => {
           amount: total,
           status: "aguardando_pagamento",
           payment_method: "pix",
+          organizer_id: event.organizer_id,
+          platform_fee: platformFee,
+          collective_owner_id: collectiveOwnerId,
+          collective_fee: collectiveFee,
+          photographer_net: photographerNet,
         })
         .select()
         .single();
@@ -319,22 +263,21 @@ Deno.serve(async (req) => {
 
       if (itemsError) throw new Error(`Items error: ${itemsError.message}`);
 
-      // 7. Create ASAAS PIX payment with split
-      const payment = await createPixPaymentWithSplit(
+      // 6. Create ASAAS PIX payment (conta mestre, sem split)
+      const payment = await createPixPayment(
         customer.id,
         total,
         `Compra de fotos - Evento ${eventId}`,
         order.id,
-        split
       );
 
-      // 8. Update order with ASAAS payment ID
+      // 7. Update order with ASAAS payment ID
       await supabaseAdmin
         .from("orders")
         .update({ asaas_payment_id: payment.id })
         .eq("id", order.id);
 
-      // 9. Get PIX QR Code
+      // 8. Get PIX QR Code
       const pixData = await getPixQrCode(payment.id);
 
       return new Response(JSON.stringify({

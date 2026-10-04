@@ -24,7 +24,7 @@ interface UserProfile {
   created_at: string;
   blocked: boolean;
   last_sign_in_at: string | null;
-  asaas_wallet_id: string | null;
+  cpf_cnpj: string | null;
   roles: AppRole[];
   // Computed
   totalSales: number;
@@ -79,7 +79,7 @@ const AdminUsers = () => {
 
   const fetchUsers = async () => {
     const [{ data: profiles }, { data: roles }, { data: orders }, { data: events }] = await Promise.all([
-      supabase.from("profiles").select("id, user_id, full_name, phone, interest, avatar_url, created_at, blocked, last_sign_in_at, asaas_wallet_id"),
+      supabase.from("profiles").select("id, user_id, full_name, phone, interest, avatar_url, created_at, blocked, last_sign_in_at, cpf_cnpj"),
       supabase.from("user_roles").select("user_id, role"),
       supabase.from("orders").select("event_id, amount, created_at, status, events!inner(organizer_id)").eq("status", "pago"),
       supabase.from("events").select("id, organizer_id, plan_type"),
@@ -188,7 +188,7 @@ const AdminUsers = () => {
 
   const getAsaasStatus = (user: UserProfile) => {
     if (!user.roles.includes("photographer") && !user.roles.includes("organizer")) return null;
-    if (user.asaas_wallet_id) return "configured";
+    if (user.cpf_cnpj) return "configured";
     return "not_configured";
   };
 

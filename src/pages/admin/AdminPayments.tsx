@@ -17,7 +17,7 @@ const AdminPayments = () => {
     const [{ data: o }, { data: e }, { data: p }] = await Promise.all([
       supabase.from("orders").select("*").not("asaas_payment_id", "is", null).order("created_at", { ascending: false }).limit(200),
       supabase.from("events").select("id, name, plan_type, organizer_id"),
-      supabase.from("profiles").select("user_id, full_name, asaas_wallet_id"),
+      supabase.from("profiles").select("user_id, full_name, cpf_cnpj"),
     ]);
     setOrders(o || []);
     setEvents(e || []);
@@ -58,15 +58,17 @@ const AdminPayments = () => {
       const event = events.find(e => e.id === o.event_id);
       const photographer = profiles.find(p => p.user_id === event?.organizer_id);
       const rate = event?.plan_type === "profissional" ? COMMISSION_PRO : COMMISSION_INICIO;
-      const platformFee = Math.round(Number(o.amount) * rate * 100) / 100;
-      const photographerAmount = Number(o.amount) - platformFee;
+      // Modelo de conta mestre: os valores reais já ficam gravados no pedido
+      // (creditados no wallet_ledger pelo webhook). Se ainda não tiver sido
+      // calculado (pedidos antigos), cai no fallback estimado por plan_type.
+      const platformFee = o.platform_fee != null ? Number(o.platform_fee) : Math.round(Number(o.amount) * rate * 100) / 100;
+      const photographerAmount = o.photographer_net != null ? Number(o.photographer_net) : Number(o.amount) - platformFee;
       return {
         ...o,
         eventName: event?.name || "—",
         planType: event?.plan_type || "inicio",
         photographerName: photographer?.full_name || "—",
-        hasWallet: !!photographer?.asaas_wallet_id,
-        walletId: photographer?.asaas_wallet_id || null,
+        payoutConfigured: !!photographer?.cpf_cnpj,
         platformFee,
         photographerAmount,
         commissionRate: rate,
@@ -78,7 +80,7 @@ const AdminPayments = () => {
     const total = payments.length;
     const paid = payments.filter(p => p.status === "pago").length;
     const pending = payments.filter(p => p.status === "aguardando_pagamento").length;
-    const noWallet = payments.filter(p => !p.hasWallet).length;
+    const noWallet = payments.filter(p => !p.payoutConfigured).length;
     return { total, paid, pending, noWallet };
   }, [payments]);
 
@@ -100,7 +102,7 @@ const AdminPayments = () => {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold">Pagamentos Asaas</h1>
-          <p className="text-sm text-muted-foreground">Monitoramento de cobranças, splits e status de pagamento</p>
+          <p className="text-sm text-muted-foreground">Monitoramento de cobranças, divisão interna (ledger) e status de pagamento</p>
         </div>
         <button onClick={fetchData} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-secondary text-sm font-medium hover:bg-secondary/80 transition-colors">
           <RefreshCw className="w-4 h-4" /> Atualizar
@@ -113,7 +115,7 @@ const AdminPayments = () => {
           { label: "Total Cobranças", value: stats.total, icon: CreditCard, color: "text-primary" },
           { label: "Confirmados", value: stats.paid, icon: CheckCircle, color: "text-green-500" },
           { label: "Pendentes", value: stats.pending, icon: Clock, color: "text-amber-500" },
-          { label: "Sem Wallet", value: stats.noWallet, icon: AlertTriangle, color: stats.noWallet > 0 ? "text-destructive" : "text-muted-foreground" },
+          { label: "Sem recebimento", value: stats.noWallet, icon: AlertTriangle, color: stats.noWallet > 0 ? "text-destructive" : "text-muted-foreground" },
         ].map(kpi => (
           <div key={kpi.label} className="glass-card p-4">
             <kpi.icon className={`w-5 h-5 ${kpi.color} mb-2`} />
@@ -152,7 +154,7 @@ const AdminPayments = () => {
                   <span className="flex items-center justify-center gap-1"><ArrowRightLeft className="w-3 h-3" /> Split</span>
                 </th>
                 <th className="text-left p-3 font-medium">Status</th>
-                <th className="text-left p-3 font-medium hidden lg:table-cell">Wallet</th>
+                <th className="text-left p-3 font-medium hidden lg:table-cell">Recebimento</th>
                 <th className="text-center p-3 font-medium">Ação</th>
               </tr>
             </thead>
@@ -184,8 +186,8 @@ const AdminPayments = () => {
                     </div>
                   </td>
                   <td className="p-3 hidden lg:table-cell">
-                    {p.hasWallet ? (
-                      <span className="text-xs text-green-500 font-mono">{p.walletId?.slice(0, 12)}...</span>
+                    {p.payoutConfigured ? (
+                      <span className="text-xs text-green-500 font-semibold">Configurado</span>
                     ) : (
                       <span className="text-xs text-destructive font-semibold">Não configurado</span>
                     )}

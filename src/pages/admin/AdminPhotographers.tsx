@@ -25,7 +25,7 @@ const AdminPhotographers = () => {
     const fetch = async () => {
       const [{ data: roles }, { data: profiles }, { data: events }, { data: orders }, { data: photos }, { data: sites }] = await Promise.all([
         supabase.from("user_roles").select("user_id").eq("role", "photographer"),
-        supabase.from("profiles").select("user_id, full_name, avatar_url, asaas_wallet_id"),
+        supabase.from("profiles").select("user_id, full_name, avatar_url, cpf_cnpj"),
         supabase.from("events").select("id, organizer_id, plan_type"),
         supabase.from("orders").select("event_id, amount, status").eq("status", "pago"),
         supabase.from("event_photos").select("id, event_id"),
@@ -45,7 +45,7 @@ const AdminPhotographers = () => {
             full_name: profile?.full_name || "Sem nome",
             avatar_url: profile?.avatar_url ?? null,
             plan_type: hasPro ? "Profissional" : "Início",
-            asaas_configured: !!profile?.asaas_wallet_id,
+            asaas_configured: !!profile?.cpf_cnpj,
             total_events: userEvents.length,
             total_revenue: revenue,
             total_photos: photoCount,
