@@ -13,10 +13,10 @@ export const useTheme = () => useContext(ThemeContext);
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const [theme, setTheme] = useState<Theme>(() => {
-    // Migração: limpa a chave antiga para forçar default branco em quem já visitou
+    // Migração: limpa a chave antiga de tema
     try { localStorage.removeItem("admin-theme"); } catch {}
     const saved = localStorage.getItem("viu-theme-v2");
-    return (saved as Theme) || "clean";
+    return (saved as Theme) || "dark";
   });
 
   useEffect(() => {

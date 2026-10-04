@@ -1,4 +1,4 @@
-import { Search, Camera, ScanFace, Users } from "lucide-react";
+import { Search, ScanFace, Users } from "lucide-react";
 import { useState, useEffect, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -34,6 +34,10 @@ const DEFAULT_SETTINGS: HeroSettings = {
   interval_seconds: 6,
   autoplay: true,
 };
+
+// Pequeno texto de contexto acima do título — reaproveita a frase padrão do
+// sistema (DEFAULT_SETTINGS.title) como "kicker", em vez de inventar um texto novo.
+const EYEBROW_TEXT = DEFAULT_SETTINGS.title;
 
 const HeroSection = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -167,207 +171,197 @@ const HeroSection = () => {
   };
 
   return (
-    <section className="relative bg-background overflow-visible min-h-[500px] sm:min-h-[600px] lg:min-h-[700px]">
+    <section className="relative bg-background overflow-hidden min-h-[560px] sm:min-h-[640px] lg:min-h-[760px]">
       {isLoading && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-background">
-          <div className="container mx-auto px-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-              <div className="space-y-6">
-                <div className="h-16 w-3/4 bg-muted animate-pulse rounded-2xl" />
-                <div className="h-8 w-1/2 bg-muted animate-pulse rounded-xl" />
-                <div className="h-20 w-full bg-muted animate-pulse rounded-2xl" />
-              </div>
-              <div className="hidden lg:block h-[500px] bg-muted animate-pulse rounded-[2.5rem]" />
+        <div className="absolute inset-0 z-50 flex items-end bg-background">
+          <div className="container mx-auto px-4 pb-32 sm:pb-40">
+            <div className="max-w-xl space-y-5">
+              <div className="h-5 w-40 bg-muted animate-pulse rounded-full" />
+              <div className="h-14 w-full bg-muted animate-pulse rounded-2xl" />
+              <div className="h-14 w-3/4 bg-muted animate-pulse rounded-2xl" />
+              <div className="h-16 w-full bg-muted animate-pulse rounded-2xl mt-4" />
             </div>
           </div>
         </div>
       )}
+
       <motion.div
         initial={{ opacity: 0 }}
         animate={!isLoading ? { opacity: 1 } : {}}
         transition={{ duration: 0.6 }}
-        className="w-full h-full"
+        className="relative w-full h-full"
       >
-        {/* Right-side image fills the entire hero on desktop */}
+        {/* Fotografia ocupa o Hero inteiro — protagonista, sem camada escura por cima */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.98 }}
+          initial={{ opacity: 0, scale: 1.03 }}
           animate={mounted ? { opacity: 1, scale: 1 } : {}}
-          transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
-          className="hidden lg:block absolute top-0 right-0 bottom-0 w-[58%] z-0"
+          transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
+          className="absolute inset-0 z-0"
         >
           {slidesToRender.map((m, i) => {
             const isActive = i === currentSlide % slidesToRender.length;
             return renderMedia(m, i, isActive, { eager: i === 0 });
           })}
-          {/* Soft fade from background on the left edge to blend with text */}
+
+          {/* Legibilidade localizada: um degradê suave e curto, só atrás do texto
+              (canto superior-esquerdo), nada de camada escura sobre a foto inteira. */}
           <div
-            className="absolute inset-y-0 left-0 w-1/3 pointer-events-none"
+            aria-hidden
+            className="absolute inset-0 pointer-events-none"
             style={{
               background:
-                "linear-gradient(to right, hsl(var(--background)) 0%, hsl(var(--background)/0.55) 45%, transparent 100%)",
+                "linear-gradient(118deg, rgba(8,8,14,0.72) 0%, rgba(8,8,14,0.5) 22%, rgba(8,8,14,0.2) 42%, transparent 58%)",
             }}
           />
-          {/* Floating social proof badge */}
-          <motion.div
-            initial={{ opacity: 0, y: 14 }}
-            animate={mounted ? { opacity: 1, y: 0 } : {}}
-            transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.6 }}
-            className="absolute bottom-32 right-8 flex items-center gap-3 rounded-2xl px-4 py-3 backdrop-blur-md border border-white/20"
-            style={{ background: "hsla(256, 76%, 57%, 0.55)" }}
-          >
-            <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center">
-              <Users className="w-5 h-5 text-white" />
-            </div>
-            <div className="text-white leading-tight">
-              <div className="font-black text-sm sm:text-base">+2 milhões</div>
-              <div className="text-[11px] sm:text-xs text-white/85">
-                de fotos entregues
-                <br />
-                em todo o Brasil
-              </div>
-            </div>
-          </motion.div>
+          {/* Transição bem sutil na base, só para a faixa de benefícios "flutuar" por cima */}
+          <div
+            aria-hidden
+            className="absolute inset-x-0 bottom-0 h-40 pointer-events-none"
+            style={{
+              background:
+                "linear-gradient(to top, rgba(8,8,14,0.4) 0%, transparent 100%)",
+            }}
+          />
         </motion.div>
 
-        <div className="container mx-auto px-4 pt-20 sm:pt-24 pb-32 sm:pb-44 relative">
-          <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_1fr] gap-10 lg:gap-12 items-center">
-            {/* Left: content */}
-            <div className="relative z-10 max-w-xl">
-              <motion.h1
-                initial={{ opacity: 0, y: 22 }}
-                animate={mounted ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
-                className="display-title mb-5"
-                style={{ color: settings.title_color }}
-              >
-                {(() => {
-                  const words = (settings.title || "").split(/\s+/).filter(Boolean);
-                  return words.map((w, i) => (
-                    <span key={i}>
-                      {w}
-                      {i < words.length - 1 ? (
-                        <>
-                          {i === 2 ? <br className="sm:hidden" aria-hidden /> : null}
-                          {" "}
-                        </>
-                      ) : null}
-                    </span>
-                  ));
-                })()}
-                <br className="sm:hidden" aria-hidden />
-                <span className="hidden sm:inline"> </span>
-                <span style={{ color: settings.highlight_color }}>
-                  {settings.highlight}
-                </span>
-              </motion.h1>
+        {/* Selo de prova social flutuando sobre a foto */}
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={mounted ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.6 }}
+          className="hidden sm:flex absolute bottom-28 sm:bottom-36 right-6 lg:right-10 z-10 items-center gap-3 rounded-2xl px-4 py-3 backdrop-blur-md border border-white/20"
+          style={{ background: "hsla(256, 76%, 57%, 0.55)" }}
+        >
+          <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+            <Users className="w-5 h-5 text-white" />
+          </div>
+          <div className="text-white leading-tight">
+            <div className="font-black text-sm sm:text-base">+2 milhões</div>
+            <div className="text-[11px] sm:text-xs text-white/85">
+              de fotos entregues
+              <br />
+              em todo o Brasil
+            </div>
+          </div>
+        </motion.div>
 
-              <motion.p
-                initial={{ opacity: 0, y: 18 }}
-                animate={mounted ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
-                className="body-base text-muted-foreground max-w-md mb-8"
-              >
-                Mostre seu rosto ou digite seu número de peito. Nossa inteligência
-                artificial encontra todas as suas fotos automaticamente e entrega em alta resolução.
-              </motion.p>
+        {/* Conteúdo: texto + busca, sobre a área naturalmente mais escura da foto */}
+        <div className="relative z-10 container mx-auto px-4 pt-28 sm:pt-32 lg:pt-36 pb-32 sm:pb-44">
+          <div className="max-w-xl">
+            <motion.p
+              initial={{ opacity: 0, y: 14 }}
+              animate={mounted ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+              className="caption font-bold uppercase tracking-[0.18em] text-white/80 mb-3"
+              style={{ textShadow: "0 1px 12px rgba(0,0,0,0.45)" }}
+            >
+              {EYEBROW_TEXT}
+            </motion.p>
 
-              <motion.form
-                onSubmit={handleSearch}
-                initial={{ opacity: 0, y: 18 }}
-                animate={mounted ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.3 }}
-                className="max-w-xl"
-              >
-                <div className="bg-card border border-border rounded-2xl shadow-[0_20px_50px_-20px_hsl(220_39%_11%/0.18)] p-1.5 sm:p-2 flex items-center gap-1 sm:gap-2">
-                  <div className="flex items-center gap-0.5 sm:gap-1 pl-1 sm:pl-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setSearchMode("text")}
-                      aria-label="Buscar por texto"
-                      className={`p-2 rounded-lg transition-all duration-200 ${
-                        searchMode === "text"
-                          ? "bg-primary text-primary-foreground shadow-md shadow-primary/25"
-                          : "text-muted-foreground hover:text-primary hover:bg-primary/5"
-                      }`}
-                    >
-                      <Search className="w-4 h-4 sm:w-5 sm:h-5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSearchMode("face")}
-                      aria-label="Buscar por reconhecimento facial"
-                      className={`p-2 rounded-lg transition-all duration-200 ${
-                        searchMode === "face"
-                          ? "bg-primary text-primary-foreground shadow-md shadow-primary/25"
-                          : "text-muted-foreground hover:text-primary hover:bg-primary/5"
-                      }`}
-                    >
-                      <ScanFace className="w-4 h-4 sm:w-5 sm:h-5" />
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    placeholder={
-                      searchMode === "text"
-                        ? "Digite o nome do evento..."
-                        : "Envie sua selfie..."
-                    }
-                    className="flex-1 min-w-0 bg-transparent text-foreground placeholder:text-muted-foreground outline-none body-base py-2.5 sm:py-3 px-2"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                  <button
-                    type="submit"
-                    className="px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-cta text-cta-foreground font-bold text-sm min-h-[44px] shrink-0 hover:bg-cta-dark hover:text-cta-foreground transition-colors shadow-[0_8px_20px_-6px_hsl(var(--cta)/0.55)]"
-                  >
-                    Buscar
-                  </button>
-                </div>
-                <p className="caption text-muted-foreground mt-3 ml-1 whitespace-pre-line">
-                  Grátis para buscar e visualizar - você só paga o que quiser baixar.{"\n"}
-                  Não sabe o nome do evento?{" "}
+            <motion.h1
+              initial={{ opacity: 0, y: 22 }}
+              animate={mounted ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.08 }}
+              className="display-title mb-5 text-white"
+              style={{ textShadow: "0 4px 28px rgba(0,0,0,0.5)" }}
+            >
+              {(() => {
+                const words = (settings.title || "").split(/\s+/).filter(Boolean);
+                return words.map((w, i) => (
+                  <span key={i}>
+                    {w}
+                    {i < words.length - 1 ? (
+                      <>
+                        {i === 2 ? <br className="sm:hidden" aria-hidden /> : null}
+                        {" "}
+                      </>
+                    ) : null}
+                  </span>
+                ));
+              })()}
+              <br className="sm:hidden" aria-hidden />
+              <span className="hidden sm:inline"> </span>
+              <span style={{ color: settings.highlight_color }}>{settings.highlight}</span>
+            </motion.h1>
+
+            <motion.p
+              initial={{ opacity: 0, y: 18 }}
+              animate={mounted ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.16 }}
+              className="body-base text-white/90 max-w-md mb-8"
+              style={{ textShadow: "0 2px 16px rgba(0,0,0,0.45)" }}
+            >
+              Mostre seu rosto ou digite seu número de peito. Nossa inteligência
+              artificial encontra todas as suas fotos automaticamente e entrega em alta resolução.
+            </motion.p>
+
+            <motion.form
+              onSubmit={handleSearch}
+              initial={{ opacity: 0, y: 18 }}
+              animate={mounted ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.24 }}
+              className="max-w-xl"
+            >
+              <div className="bg-card border border-border rounded-2xl shadow-[0_20px_50px_-15px_rgba(0,0,0,0.45)] p-1.5 sm:p-2 flex items-center gap-1 sm:gap-2">
+                <div className="flex items-center gap-0.5 sm:gap-1 pl-1 sm:pl-2 shrink-0">
                   <button
                     type="button"
-                    onClick={() => navigate("/buscar")}
-                    className="text-primary font-semibold hover:underline"
+                    onClick={() => setSearchMode("text")}
+                    aria-label="Buscar por texto"
+                    className={`p-2 rounded-lg transition-all duration-200 ${
+                      searchMode === "text"
+                        ? "bg-primary text-primary-foreground shadow-md shadow-primary/25"
+                        : "text-muted-foreground hover:text-primary hover:bg-primary/5"
+                    }`}
                   >
-                    Clique aqui
+                    <Search className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
-                </p>
-              </motion.form>
-            </div>
-
-            {/* Right: mobile/tablet image (desktop uses absolute fill above) */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.97 }}
-              animate={mounted ? { opacity: 1, scale: 1 } : {}}
-              transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
-              className="relative h-[340px] sm:h-[440px] rounded-3xl overflow-hidden lg:hidden"
-            >
-              {slidesToRender.map((m, i) => {
-                const isActive = i === currentSlide % slidesToRender.length;
-                return renderMedia(m, i, isActive);
-              })}
-              <motion.div
-                initial={{ opacity: 0, y: 14 }}
-                animate={mounted ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.6 }}
-                className="absolute bottom-5 right-5 flex items-center gap-3 rounded-2xl px-4 py-3 backdrop-blur-md border border-white/20"
-                style={{ background: "hsla(256, 76%, 57%, 0.55)" }}
+                  <button
+                    type="button"
+                    onClick={() => setSearchMode("face")}
+                    aria-label="Buscar por reconhecimento facial"
+                    className={`p-2 rounded-lg transition-all duration-200 ${
+                      searchMode === "face"
+                        ? "bg-primary text-primary-foreground shadow-md shadow-primary/25"
+                        : "text-muted-foreground hover:text-primary hover:bg-primary/5"
+                    }`}
+                  >
+                    <ScanFace className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  placeholder={
+                    searchMode === "text"
+                      ? "Digite o nome do evento..."
+                      : "Envie sua selfie..."
+                  }
+                  className="flex-1 min-w-0 bg-transparent text-foreground placeholder:text-muted-foreground outline-none body-base py-2.5 sm:py-3 px-2"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                <button
+                  type="submit"
+                  className="px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-cta text-cta-foreground font-bold text-sm min-h-[44px] shrink-0 hover:bg-cta-dark hover:text-cta-foreground transition-colors shadow-[0_8px_20px_-6px_hsl(var(--cta)/0.55)]"
+                >
+                  Buscar
+                </button>
+              </div>
+              <p
+                className="caption text-white/80 mt-3 ml-1 whitespace-pre-line"
+                style={{ textShadow: "0 1px 10px rgba(0,0,0,0.4)" }}
               >
-                <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center">
-                  <Users className="w-5 h-5 text-white" />
-                </div>
-                <div className="text-white leading-tight">
-                  <div className="font-black text-sm">+2 milhões</div>
-                  <div className="text-[11px] text-white/85">
-                    de fotos entregues
-                    <br />
-                    em todo o Brasil
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
+                Grátis para buscar e visualizar - você só paga o que quiser baixar.{"\n"}
+                Não sabe o nome do evento?{" "}
+                <button
+                  type="button"
+                  onClick={() => navigate("/buscar")}
+                  className="text-white font-semibold underline underline-offset-2 hover:text-white/80"
+                >
+                  Clique aqui
+                </button>
+              </p>
+            </motion.form>
           </div>
         </div>
       </motion.div>
