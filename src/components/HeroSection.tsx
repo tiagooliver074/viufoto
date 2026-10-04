@@ -193,15 +193,100 @@ const HeroSection = () => {
       >
         {/* Fotografia ocupa o Hero inteiro — protagonista, sem camada escura por cima */}
         <motion.div
-          initial={{ opacity: 0, scale: 1.03 }}
-          animate={mounted ? { opacity: 1, scale: 1 } : {}}
+          initial={{ opacity: 0 }}
+          animate={mounted ? { opacity: 1 } : {}}
           transition={{ duration: 1, ease: [0.16, 1, 0.3, 1] }}
-          className="absolute inset-0 z-0"
+          className="absolute inset-0 z-0 overflow-hidden"
         >
-          {slidesToRender.map((m, i) => {
-            const isActive = i === currentSlide % slidesToRender.length;
-            return renderMedia(m, i, isActive, { eager: i === 0 });
-          })}
+          {/* Camada com leve "Ken Burns": zoom e deslocamento bem sutis e contínuos,
+              para a foto não ficar estática. */}
+          <motion.div
+            className="absolute inset-0"
+            initial={{ scale: 1.03, x: 0 }}
+            animate={{ scale: [1.03, 1.09, 1.03], x: [0, -16, 0] }}
+            transition={{ duration: 26, ease: "easeInOut", repeat: Infinity }}
+          >
+            {slidesToRender.map((m, i) => {
+              const isActive = i === currentSlide % slidesToRender.length;
+              return renderMedia(m, i, isActive, { eager: i === 0 });
+            })}
+          </motion.div>
+
+          {/* Efeito sutil de "leitura"/reconhecimento facial — puramente decorativo,
+              sugere a busca por reconhecimento facial do app. Oculto em telas pequenas. */}
+          <div
+            aria-hidden
+            className="hidden sm:block absolute z-[2] pointer-events-none"
+            style={{ right: "16%", top: "20%", width: "170px", height: "220px" }}
+          >
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={mounted ? { opacity: 0.4 } : {}}
+              transition={{ duration: 1.4, delay: 1.1 }}
+              className="absolute inset-0"
+            >
+              {[
+                "top-0 left-0 border-t-2 border-l-2 rounded-tl-md",
+                "top-0 right-0 border-t-2 border-r-2 rounded-tr-md",
+                "bottom-0 left-0 border-b-2 border-l-2 rounded-bl-md",
+                "bottom-0 right-0 border-b-2 border-r-2 rounded-br-md",
+              ].map((cls, i) => (
+                <span
+                  key={i}
+                  className={`absolute w-4 h-4 ${cls}`}
+                  style={{ borderColor: "rgba(166,255,214,0.8)" }}
+                />
+              ))}
+            </motion.div>
+
+            <motion.div
+              initial={{ top: "0%", opacity: 0 }}
+              animate={
+                mounted
+                  ? { top: ["0%", "96%", "0%"], opacity: [0, 0.75, 0.75, 0] }
+                  : {}
+              }
+              transition={{
+                duration: 3.8,
+                repeat: Infinity,
+                repeatDelay: 1.8,
+                ease: "easeInOut",
+                delay: 1.6,
+              }}
+              className="absolute left-0 right-0 h-px"
+              style={{
+                background:
+                  "linear-gradient(90deg, transparent, rgba(166,255,214,0.9), transparent)",
+                boxShadow: "0 0 8px rgba(166,255,214,0.6)",
+              }}
+            />
+
+            {[
+              { left: "26%", top: "32%" },
+              { left: "66%", top: "32%" },
+              { left: "46%", top: "66%" },
+            ].map((pos, i) => (
+              <motion.span
+                key={i}
+                className="absolute w-1.5 h-1.5 rounded-full"
+                style={{
+                  ...pos,
+                  background: "rgba(214,255,235,0.95)",
+                  boxShadow: "0 0 6px rgba(166,255,214,0.8)",
+                }}
+                initial={{ opacity: 0.2, scale: 0.8 }}
+                animate={
+                  mounted ? { opacity: [0.2, 1, 0.2], scale: [0.8, 1.15, 0.8] } : {}
+                }
+                transition={{
+                  duration: 2.2,
+                  repeat: Infinity,
+                  delay: 1.8 + i * 0.3,
+                  ease: "easeInOut",
+                }}
+              />
+            ))}
+          </div>
 
           {/* Legibilidade localizada: um degradê suave e curto, só atrás do texto
               (canto superior-esquerdo), nada de camada escura sobre a foto inteira. */}
