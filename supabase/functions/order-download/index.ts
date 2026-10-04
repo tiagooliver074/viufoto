@@ -25,6 +25,33 @@ async function signRead(objectPath: string): Promise<string> {
   return await getSignedUrl(s3, cmd, { expiresIn: READ_EXPIRES_IN });
 }
 
+// Segurança (item 4 da auditoria, 2026-10-04): "lookup" e "download" aceitavam
+// qualquer e-mail digitado pelo chamador como prova de dono do pedido — sem
+// verificação nenhuma. Quem soubesse (ou adivinhasse) o e-mail de um cliente
+// conseguia ver todo o histórico de compras dele e, pior, baixar as fotos de
+// verdade. Agora exigimos posse real do e-mail via OTP do Supabase Auth: o
+// cliente pede um código em "Meus Pedidos", confirma (supabase.auth.verifyOtp)
+// e o navegador passa a enviar um JWT de sessão real nas chamadas seguintes —
+// chamada que o front-end já inclui sozinho via supabase.functions.invoke.
+// getVerifiedEmail decodifica esse JWT contra o GoTrue; a chave anon/publishable
+// (usada por chamadas sem login) não tem usuário associado e retorna null aqui.
+async function getVerifiedEmail(req: Request): Promise<string | null> {
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader) return null;
+  try {
+    const userClient = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+    const { data: { user }, error } = await userClient.auth.getUser();
+    if (error || !user?.email) return null;
+    return user.email.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -45,11 +72,14 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { action, order_id, email, token } = body;
 
-    // Action: lookup orders by email
+    // Action: lookup orders by email — exige e-mail verificado por OTP (ver
+    // getVerifiedEmail acima). Nunca confia no "email" do corpo da requisição
+    // para decidir o que mostrar: ele é ignorado para fins de autorização.
     if (action === "lookup") {
-      if (!email) {
-        return new Response(JSON.stringify({ error: "Email é obrigatório" }), {
-          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      const verifiedEmail = await getVerifiedEmail(req);
+      if (!verifiedEmail) {
+        return new Response(JSON.stringify({ error: "Verifique seu e-mail para consultar seus pedidos" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
@@ -59,7 +89,7 @@ Deno.serve(async (req) => {
           id, client_name, client_email, amount, status, payment_method, created_at, event_id,
           order_items ( id, photo_id, video_id, price )
         `)
-        .eq("client_email", email.toLowerCase().trim())
+        .eq("client_email", verifiedEmail)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -88,10 +118,12 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Action: download - generate signed URLs for a paid order
+    // Action: download - generate signed URLs for a paid order.
+    // email agora é opcional no corpo quando a chamada já carrega uma sessão
+    // verificada (Authorization de usuário real) — ver checagem de dono abaixo.
     if (action === "download") {
-      if (!order_id || !email) {
-        return new Response(JSON.stringify({ error: "order_id e email são obrigatórios" }), {
+      if (!order_id) {
+        return new Response(JSON.stringify({ error: "order_id é obrigatório" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
@@ -109,7 +141,15 @@ Deno.serve(async (req) => {
         });
       }
 
-      if (order.client_email.toLowerCase() !== email.toLowerCase().trim()) {
+      // Autorização (item 4 da auditoria, 2026-10-04): se vier um JWT de sessão
+      // real (cliente passou pelo OTP em "Meus Pedidos"), confiamos no e-mail
+      // verificado pelo GoTrue — nunca no "email" do corpo. Sem sessão (fluxo
+      // imediato logo após o pagamento, mesma aba, com o order_id que acabou de
+      // ser criado), mantemos a checagem original por order_id + email digitado:
+      // o order_id é um UUID não adivinhável e só o navegador que pagou o tem.
+      const verifiedEmail = await getVerifiedEmail(req);
+      const ownerEmail = verifiedEmail ?? (email ? String(email).toLowerCase().trim() : null);
+      if (!ownerEmail || order.client_email.toLowerCase() !== ownerEmail) {
         return new Response(JSON.stringify({ error: "Acesso negado" }), {
           status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });

@@ -44,6 +44,10 @@ const statusConfig: Record<string, { label: string; icon: typeof CheckCircle2; c
 
 const MeusPedidos = () => {
   const [email, setEmail] = useState("");
+  const [code, setCode] = useState("");
+  const [step, setStep] = useState<"email" | "code">("email");
+  const [sendingCode, setSendingCode] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -51,18 +55,62 @@ const MeusPedidos = () => {
   const [downloadFiles, setDownloadFiles] = useState<DownloadFile[]>([]);
   const [showDownload, setShowDownload] = useState<string | null>(null);
 
-  const handleSearch = async (e: React.FormEvent) => {
+  // Passo 1: pede um código de verificação por e-mail (Supabase Auth OTP).
+  // Isso prova que quem está pedindo realmente tem acesso àquele e-mail —
+  // antes, bastava digitar qualquer e-mail para ver o histórico de pedidos.
+  const handleSendCode = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) {
       toast.error("Digite seu e-mail");
       return;
     }
+    setSendingCode(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({
+        email: email.trim(),
+        options: { shouldCreateUser: true },
+      });
+      if (error) throw error;
+      setStep("code");
+      toast.success("Código enviado! Confira seu e-mail.");
+    } catch (err: any) {
+      toast.error("Erro ao enviar código: " + err.message);
+    } finally {
+      setSendingCode(false);
+    }
+  };
 
+  // Passo 2: confirma o código. Isso cria uma sessão real do Supabase Auth
+  // para esse e-mail — a partir daqui, toda chamada a order-download já leva
+  // esse login junto, e a função só mostra/libera o que pertence a ele.
+  const handleVerifyCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!code.trim()) {
+      toast.error("Digite o código recebido por e-mail");
+      return;
+    }
+    setVerifying(true);
+    try {
+      const { error } = await supabase.auth.verifyOtp({
+        email: email.trim(),
+        token: code.trim(),
+        type: "email",
+      });
+      if (error) throw error;
+      await handleSearch();
+    } catch (err: any) {
+      toast.error("Código inválido ou expirado: " + err.message);
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleSearch = async () => {
     setLoading(true);
     setSearched(true);
     try {
       const { data, error } = await supabase.functions.invoke("order-download", {
-        body: { action: "lookup", email: email.trim() },
+        body: { action: "lookup" },
       });
       if (error) throw new Error(error.message);
       setOrders(data.orders || []);
@@ -104,30 +152,64 @@ const MeusPedidos = () => {
         <div className="max-w-2xl mx-auto">
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-2">Meus Pedidos</h1>
           <p className="text-muted-foreground mb-8">
-            Digite seu e-mail para consultar seus pedidos e baixar suas fotos.
+            {step === "email"
+              ? "Digite seu e-mail para receber um código e consultar seus pedidos."
+              : `Digite o código que enviamos para ${email.trim()}.`}
           </p>
 
-          {/* Search Form */}
-          <form onSubmit={handleSearch} className="flex gap-3 mb-8">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          {/* Step 1: email -> send OTP code */}
+          {step === "email" && (
+            <form onSubmit={handleSendCode} className="flex gap-3 mb-8">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  type="email"
+                  placeholder="Digite seu e-mail..."
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-secondary border border-border text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors text-sm"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={sendingCode}
+                className="px-6 py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:bg-primary/90 transition-all disabled:opacity-50 flex items-center gap-2"
+              >
+                {sendingCode ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                Enviar código
+              </button>
+            </form>
+          )}
+
+          {/* Step 2: confirm OTP code */}
+          {step === "code" && (
+            <form onSubmit={handleVerifyCode} className="flex gap-3 mb-3">
               <input
-                type="email"
-                placeholder="Digite seu e-mail..."
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 rounded-xl bg-secondary border border-border text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors text-sm"
+                type="text"
+                inputMode="numeric"
+                placeholder="Código recebido por e-mail"
+                value={code}
+                onChange={e => setCode(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-secondary border border-border text-foreground placeholder:text-muted-foreground outline-none focus:border-primary transition-colors text-sm tracking-widest"
               />
-            </div>
+              <button
+                type="submit"
+                disabled={verifying || loading}
+                className="px-6 py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:bg-primary/90 transition-all disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+              >
+                {(verifying || loading) ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                Confirmar
+              </button>
+            </form>
+          )}
+          {step === "code" && (
             <button
-              type="submit"
-              disabled={loading}
-              className="px-6 py-3 rounded-xl bg-primary text-primary-foreground font-bold text-sm hover:bg-primary/90 transition-all disabled:opacity-50 flex items-center gap-2"
+              onClick={() => { setStep("email"); setCode(""); }}
+              className="text-xs text-muted-foreground hover:text-foreground mb-8 underline"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-              Buscar
+              Usar outro e-mail
             </button>
-          </form>
+          )}
 
           {/* Download modal */}
           {showDownload && (
