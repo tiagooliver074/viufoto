@@ -159,13 +159,13 @@ const HeroSection = () => {
       <img
         key={m.url + i}
         src={m.url}
-        alt="Atletas em corrida"
+        alt="Atleta em close, iluminação dramática"
         loading={opts?.eager ? "eager" : "lazy"}
         fetchPriority={opts?.eager ? "high" : "low"}
         className="absolute inset-0 w-full h-full object-cover transition-opacity ease-out"
         style={{ transitionDuration: `${transitionMs}ms`, opacity: isActive ? 1 : 0 }}
-        width={1920}
-        height={1080}
+        width={1672}
+        height={941}
       />
     );
   };
@@ -217,7 +217,7 @@ const HeroSection = () => {
           <div
             aria-hidden
             className="hidden sm:block absolute z-[2] pointer-events-none"
-            style={{ right: "16%", top: "20%", width: "170px", height: "220px" }}
+            style={{ right: "6%", top: "15%", width: "23%", height: "37%" }}
           >
             <motion.div
               initial={{ opacity: 0 }}
@@ -262,9 +262,9 @@ const HeroSection = () => {
             />
 
             {[
-              { left: "26%", top: "32%" },
-              { left: "66%", top: "32%" },
-              { left: "46%", top: "66%" },
+              { left: "22%", top: "42%" },
+              { left: "48%", top: "72%" },
+              { left: "88%", top: "50%" },
             ].map((pos, i) => (
               <motion.span
                 key={i}
