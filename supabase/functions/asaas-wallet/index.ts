@@ -35,7 +35,10 @@ async function asaasFetch(path: string, options: RequestInit = {}) {
   const data = await res.json();
   if (!res.ok) {
     console.error("ASAAS error:", JSON.stringify(data));
-    throw new Error(data.errors?.[0]?.description || `ASAAS error ${res.status}`);
+    // A Asaas às vezes retorna { errors: [{description}] } e às vezes { message }
+    // (ex.: restrições de produto, como subconta exigir CNPJ) — sem isso, o
+    // usuário via só "ASAAS error 403" em vez do motivo real.
+    throw new Error(data.errors?.[0]?.description || data.message || `ASAAS error ${res.status}`);
   }
   return data;
 }
