@@ -1,21 +1,36 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { S3Client, GetObjectCommand } from "npm:@aws-sdk/client-s3@3";
+import { getSignedUrl } from "npm:@aws-sdk/s3-request-presigner@3";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const GATEWAY_URL = "https://connector-gateway.lovable.dev";
+// Migrado em 2026-10-02: antes passava por connector-gateway.lovable.dev
+// (LOVABLE_API_KEY + AWS_S3_API_KEY). Agora assina direto com o SDK da AWS,
+// usando a mesma credencial IAM já usada pelo Rekognition (viufoto-s3-user,
+// que já tem AmazonS3FullAccess) — elimina a dependência de infraestrutura
+// viva da Lovable para gerar os links de download de pedidos pagos.
+const BUCKET = Deno.env.get("S3_BUCKET")!;
+const REGION = Deno.env.get("AWS_S3_REGION") || Deno.env.get("AWS_REKOGNITION_REGION") || "sa-east-1";
+const ACCESS_KEY_ID = Deno.env.get("AWS_REKOGNITION_ACCESS_KEY_ID")!;
+const SECRET_ACCESS_KEY = Deno.env.get("AWS_REKOGNITION_SECRET_ACCESS_KEY")!;
+const READ_EXPIRES_IN = 86400; // 24h — mesmo prazo usado antes via gateway da Lovable
+
+const s3 = new S3Client({ region: REGION, credentials: { accessKeyId: ACCESS_KEY_ID, secretAccessKey: SECRET_ACCESS_KEY } });
+
+async function signRead(objectPath: string): Promise<string> {
+  const cmd = new GetObjectCommand({ Bucket: BUCKET, Key: objectPath });
+  return await getSignedUrl(s3, cmd, { expiresIn: READ_EXPIRES_IN });
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  const AWS_S3_API_KEY = Deno.env.get("AWS_S3_API_KEY");
-
-  if (!LOVABLE_API_KEY || !AWS_S3_API_KEY) {
+  if (!BUCKET || !ACCESS_KEY_ID || !SECRET_ACCESS_KEY) {
     return new Response(JSON.stringify({ error: "Server configuration error" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -183,25 +198,8 @@ Deno.serve(async (req) => {
         }
 
         try {
-          const signRes = await fetch(
-            `${GATEWAY_URL}/api/v1/sign_storage_url?provider=aws_s3&mode=read`,
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${LOVABLE_API_KEY}`,
-                "X-Connection-Api-Key": AWS_S3_API_KEY,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ object_path: file.path }),
-            }
-          );
-
-          if (signRes.ok) {
-            const { url } = await signRes.json();
-            signedFiles.push({ ...file, url });
-          } else {
-            signedFiles.push({ ...file, url: null, error: "Falha ao gerar URL" });
-          }
+          const url = await signRead(file.path);
+          signedFiles.push({ ...file, url });
         } catch {
           signedFiles.push({ ...file, url: null, error: "Erro interno" });
         }
@@ -324,24 +322,8 @@ Deno.serve(async (req) => {
           continue;
         }
         try {
-          const signRes = await fetch(
-            `${GATEWAY_URL}/api/v1/sign_storage_url?provider=aws_s3&mode=read`,
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${LOVABLE_API_KEY}`,
-                "X-Connection-Api-Key": AWS_S3_API_KEY,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ object_path: file.path }),
-            }
-          );
-          if (signRes.ok) {
-            const { url } = await signRes.json();
-            signedFiles.push({ ...file, url });
-          } else {
-            signedFiles.push({ ...file, url: null });
-          }
+          const url = await signRead(file.path);
+          signedFiles.push({ ...file, url });
         } catch {
           signedFiles.push({ ...file, url: null });
         }
