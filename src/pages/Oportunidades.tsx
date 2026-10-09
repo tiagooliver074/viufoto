@@ -22,8 +22,8 @@ import {
    ────────────────────────────────────────────────────────── */
 
 const Oportunidades = () => {
-  const { user, profile } = useAuth();
-  const firstName = profile?.full_name?.split(" ")[0] || "Fotógrafo";
+  const { user, displayName } = useAuth();
+  const firstName = displayName?.split(" ")[0] || "Fotógrafo";
   const [applyTarget, setApplyTarget] = useState<{ id: string; name: string } | null>(null);
 
   /* ── Eventos abertos: upcoming + status público (em_breve / ativo) ── */

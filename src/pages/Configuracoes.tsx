@@ -28,8 +28,8 @@ const mockDevices = [
   { id: 3, name: "Firefox — macOS", ip: "201.12.55.90", location: "Rio de Janeiro, BR", lastActive: "Há 3 dias", current: false },
 ];
 
-const InputField = ({ label, value, type = "text", disabled = false, onChange }: {
-  label: string; value: string; type?: string; disabled?: boolean; onChange?: (v: string) => void;
+const InputField = ({ label, value, type = "text", disabled = false, onChange, placeholder }: {
+  label: string; value: string; type?: string; disabled?: boolean; onChange?: (v: string) => void; placeholder?: string;
 }) => (
   <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] items-center gap-2 py-3 border-b border-border/50 last:border-0">
     <label className="text-sm text-muted-foreground font-medium">{label}</label>
@@ -37,6 +37,7 @@ const InputField = ({ label, value, type = "text", disabled = false, onChange }:
       type={type}
       defaultValue={value}
       disabled={disabled}
+      placeholder={placeholder}
       onChange={(e) => onChange?.(e.target.value)}
       className="w-full bg-secondary/50 rounded-lg px-4 py-2.5 text-sm outline-none border border-border focus:border-primary transition-colors disabled:opacity-50"
     />
@@ -57,7 +58,12 @@ const TabConta = () => {
   const { user, profile, refreshProfile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [fullName, setFullName] = useState("");
+  // Nome de exibição (apelido livre, mostrado publicamente pelo site) — campo
+  // próprio, sem exigência de formalidade e sem o travamento de 15 dias.
+  const [displayName, setDisplayName] = useState("");
+  // Nome legal: exibido aqui só como referência (somente leitura). É editado
+  // exclusivamente na aba Carteira, onde serve para a titularidade do PIX.
+  const [legalName, setLegalName] = useState("");
   const [phone, setPhone] = useState("");
   const [cpf, setCpf] = useState("");
   const [birthDate, setBirthDate] = useState("");
@@ -65,7 +71,6 @@ const TabConta = () => {
   const [hasWallet, setHasWallet] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [fullNameUpdatedAt, setFullNameUpdatedAt] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -73,11 +78,12 @@ const TabConta = () => {
     const loadProfile = async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("full_name, phone, cpf_cnpj, avatar_url, full_name_updated_at")
+        .select("full_name, display_name, phone, cpf_cnpj, avatar_url")
         .eq("user_id", user.id)
         .single();
       if (data) {
-        setFullName(data.full_name || "");
+        setLegalName(data.full_name || "");
+        setDisplayName((data as any).display_name || "");
         setPhone(data.phone || "");
         setCpf(data.cpf_cnpj || "");
         // CPF/data de nascimento travam assim que o recebimento é configurado
@@ -85,7 +91,6 @@ const TabConta = () => {
         // para conferência de titularidade.
         setHasWallet(!!data.cpf_cnpj);
         setAvatarUrl(data.avatar_url || null);
-        setFullNameUpdatedAt((data as any).full_name_updated_at || null);
       }
       // Try to get birth date from user metadata
       const meta = user.user_metadata;
@@ -105,10 +110,11 @@ const TabConta = () => {
         setSaving(false);
         return;
       }
-      // Atualiza nome/telefone/CPF no perfil. CPF e data de nascimento só são
-      // enviados quando a carteira ainda não foi ativada (hasWallet=false);
+      // Atualiza apelido/telefone/CPF no perfil. O nome legal (full_name) NÃO
+      // é tocado aqui — é exclusivo da aba Carteira. CPF e data de nascimento
+      // só são enviados quando a carteira ainda não foi ativada (hasWallet=false);
       // uma vez ativada, ambos ficam travados na UI e não chegam aqui.
-      const profileUpdate: Record<string, unknown> = { full_name: fullName, phone };
+      const profileUpdate: Record<string, unknown> = { display_name: displayName || null, phone };
       if (!hasWallet) profileUpdate.cpf_cnpj = cleanCpf || null;
       const { error } = await supabase
         .from("profiles")
@@ -126,17 +132,16 @@ const TabConta = () => {
       }
 
       toast.success("Seus dados foram atualizados com sucesso.");
-      // Recarrega timestamp (cooldown do nome) e o estado de "carteira ativada",
-      // já que salvar o CPF aqui também destrava/trava os mesmos campos.
+      // Recarrega o estado de "carteira ativada", já que salvar o CPF aqui
+      // também destrava/trava os mesmos campos.
       const { data: fresh } = await supabase
         .from("profiles")
-        .select("full_name_updated_at, cpf_cnpj")
+        .select("cpf_cnpj")
         .eq("user_id", user.id)
         .single();
-      if (fresh) {
-        setFullNameUpdatedAt((fresh as any).full_name_updated_at || null);
-        setHasWallet(!!(fresh as any).cpf_cnpj);
-      }
+      if (fresh) setHasWallet(!!(fresh as any).cpf_cnpj);
+      // Reflete o novo apelido no navbar/perfil público imediatamente.
+      await refreshProfile();
     } catch (err: any) {
       toast.error(err.message || "Não foi possível salvar. Tente novamente.");
     } finally {
@@ -241,44 +246,32 @@ const TabConta = () => {
       </div>
 
       {/* Dados básicos */}
-      {(() => {
-        const lockedUntil = fullNameUpdatedAt
-          ? new Date(new Date(fullNameUpdatedAt).getTime() + 15 * 24 * 60 * 60 * 1000)
-          : null;
-        const nameLocked = !!(lockedUntil && lockedUntil.getTime() > Date.now());
-        const daysRemaining = nameLocked && lockedUntil
-          ? Math.ceil((lockedUntil.getTime() - Date.now()) / (24 * 60 * 60 * 1000))
-          : 0;
-        return (
-          <div className="glass-card p-6 space-y-0">
-            <InputField
-              label="Nome completo"
-              value={fullName}
-              onChange={nameLocked ? undefined : setFullName}
-              disabled={nameLocked}
-            />
-            {nameLocked && lockedUntil && (
-              <p className="text-xs text-muted-foreground -mt-2 pb-3">
-                Você poderá alterar o nome novamente em {daysRemaining} dia{daysRemaining === 1 ? "" : "s"} (liberado em {lockedUntil.toLocaleDateString("pt-BR")}).
-              </p>
-            )}
-            <InputField label="E-mail" value={email} disabled />
-            <InputField label="CPF" value={cpf} disabled={hasWallet} onChange={!hasWallet ? setCpf : undefined} />
-            <InputField label="Data de nascimento" value={birthDate} type="date" disabled={hasWallet} onChange={!hasWallet ? setBirthDate : undefined} />
-            {hasWallet && (
-              <div className="pt-2 space-y-1">
-                <p className="text-xs text-muted-foreground">CPF e data de nascimento não podem ser alterados após ativação do recebimento.</p>
-                <Link
-                  to="/chamados/novo?categoria=alteracao_dados&assunto=Alteracao%20de%20CPF"
-                  className="text-xs text-primary hover:underline inline-block"
-                >
-                  Preciso alterar meu CPF
-                </Link>
-              </div>
-            )}
+      <div className="glass-card p-6 space-y-0">
+        <InputField
+          label="Nome de exibição"
+          value={displayName}
+          onChange={setDisplayName}
+          placeholder={legalName || "Como você quer ser chamado"}
+        />
+        <p className="text-xs text-muted-foreground -mt-2 pb-3">
+          Apelido livre, mostrado no menu e no seu perfil público. Não precisa ser o nome completo.
+          {legalName && <> Nome legal cadastrado: <span className="font-medium text-foreground">{legalName}</span> (editado na aba Carteira).</>}
+        </p>
+        <InputField label="E-mail" value={email} disabled />
+        <InputField label="CPF" value={cpf} disabled={hasWallet} onChange={!hasWallet ? setCpf : undefined} />
+        <InputField label="Data de nascimento" value={birthDate} type="date" disabled={hasWallet} onChange={!hasWallet ? setBirthDate : undefined} />
+        {hasWallet && (
+          <div className="pt-2 space-y-1">
+            <p className="text-xs text-muted-foreground">CPF e data de nascimento não podem ser alterados após ativação do recebimento.</p>
+            <Link
+              to="/chamados/novo?categoria=alteracao_dados&assunto=Alteracao%20de%20CPF"
+              className="text-xs text-primary hover:underline inline-block"
+            >
+              Preciso alterar meu CPF
+            </Link>
           </div>
-        );
-      })()}
+        )}
+      </div>
 
       {/* Contato */}
       <div className="glass-card p-6 space-y-0">

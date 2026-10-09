@@ -39,8 +39,8 @@ function AnimatedNumber({ value, prefix = "", duration = 1200 }: { value: number
 }
 
 const Dashboard = () => {
-  const { user, profile } = useAuth();
-  const firstName = profile?.full_name?.split(" ")[0] || "Fotógrafo";
+  const { user, profile, displayName } = useAuth();
+  const firstName = displayName?.split(" ")[0] || "Fotógrafo";
 
   const [uploadType, setUploadType] = useState<"photos" | "videos" | null>(null);
   const [eventsPage, setEventsPage] = useState(1);

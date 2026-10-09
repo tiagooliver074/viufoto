@@ -55,7 +55,7 @@ type WithdrawalLog = {
 };
 
 const TabCarteira = () => {
-  const { user } = useAuth();
+  const { user, refreshProfile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [withdrawing, setWithdrawing] = useState(false);
@@ -188,6 +188,9 @@ const TabCarteira = () => {
       }
       if (data?.error) throw new Error(data.error);
       setConfigured(true);
+      // O nome legal salvo aqui também serve de fallback para o nome de
+      // exibição quando o usuário ainda não definiu um apelido próprio.
+      await refreshProfile();
       toast.success("Dados salvos! Agora cadastre uma chave PIX para receber. 🎉");
     } catch (err: any) {
       toast.error(err.message || "Erro ao salvar dados");
@@ -385,7 +388,7 @@ const TabCarteira = () => {
             <UserIcon className="w-5 h-5 text-primary" />
             <h3 className="font-semibold">Dados necessários</h3>
           </div>
-          <InputField label="Nome completo" value={name} onChange={setName} placeholder="Seu nome completo" required />
+          <InputField label="Nome completo (legal)" value={name} onChange={setName} placeholder="Como está no seu documento" required />
           <InputField label="CPF ou CNPJ" value={cpfCnpj} onChange={setCpfCnpj} placeholder="000.000.000-00" required />
           <InputField label="Telefone" value={phone} onChange={setPhone} placeholder="(00) 00000-0000" required />
         </div>
@@ -394,9 +397,11 @@ const TabCarteira = () => {
         <div className="glass-card p-4 flex items-start gap-3">
           <Shield className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
           <p className="text-xs text-muted-foreground">
-            Seus dados são usados apenas para confirmar a titularidade na hora do saque.
+            Seus dados são usados apenas para confirmar a titularidade na hora do saque — o nome aqui deve ser
+            idêntico ao do seu documento, pois é comparado com o CPF da chave PIX.
             Após salvar, você poderá cadastrar uma chave PIX e começar a receber — o valor de cada venda fica guardado
             no seu saldo interno e pode ser sacado via PIX a qualquer momento.
+            {" "}O apelido mostrado publicamente no site é configurado separadamente em "Minha conta".
           </p>
         </div>
 

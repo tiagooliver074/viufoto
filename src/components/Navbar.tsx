@@ -17,12 +17,12 @@ const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const isHome = location.pathname === "/";
-  const { user, profile, signOut, hasRole } = useAuth();
+  const { user, displayName: profileDisplayName, signOut, hasRole } = useAuth();
   const isPhotographer = hasRole("photographer") || hasRole("organizer");
   const { theme, toggleTheme } = useTheme();
   const isCleanTheme = theme === "clean";
 
-  const displayName = profile?.full_name || user?.email?.split("@")[0] || "Usuário";
+  const displayName = profileDisplayName || user?.email?.split("@")[0] || "Usuário";
 
   const handleSignOut = async () => {
     await signOut();

@@ -1297,7 +1297,6 @@ export type Database = {
           name: string
           organizer_id: string
           owner_commission_pct: number
-          password: string | null
           plan_type: string
           publish_at: string | null
           reference_point: string | null
@@ -1328,7 +1327,6 @@ export type Database = {
           name: string
           organizer_id: string
           owner_commission_pct?: number
-          password?: string | null
           plan_type?: string
           publish_at?: string | null
           reference_point?: string | null
@@ -1359,7 +1357,6 @@ export type Database = {
           name?: string
           organizer_id?: string
           owner_commission_pct?: number
-          password?: string | null
           plan_type?: string
           publish_at?: string | null
           reference_point?: string | null
@@ -2164,10 +2161,16 @@ export type Database = {
           client_cpf: string | null
           client_email: string
           client_name: string
+          collective_fee: number
+          collective_owner_id: string | null
           created_at: string
           event_id: string
           id: string
+          ledger_credited: boolean
+          organizer_id: string | null
           payment_method: Database["public"]["Enums"]["payment_method"] | null
+          photographer_net: number
+          platform_fee: number
           status: Database["public"]["Enums"]["order_status"]
           tracking_origin: string | null
           updated_at: string
@@ -2178,10 +2181,16 @@ export type Database = {
           client_cpf?: string | null
           client_email: string
           client_name: string
+          collective_fee?: number
+          collective_owner_id?: string | null
           created_at?: string
           event_id: string
           id?: string
+          ledger_credited?: boolean
+          organizer_id?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
+          photographer_net?: number
+          platform_fee?: number
           status?: Database["public"]["Enums"]["order_status"]
           tracking_origin?: string | null
           updated_at?: string
@@ -2192,10 +2201,16 @@ export type Database = {
           client_cpf?: string | null
           client_email?: string
           client_name?: string
+          collective_fee?: number
+          collective_owner_id?: string | null
           created_at?: string
           event_id?: string
           id?: string
+          ledger_credited?: boolean
+          organizer_id?: string | null
           payment_method?: Database["public"]["Enums"]["payment_method"] | null
+          photographer_net?: number
+          platform_fee?: number
           status?: Database["public"]["Enums"]["order_status"]
           tracking_origin?: string | null
           updated_at?: string
@@ -2727,12 +2742,17 @@ export type Database = {
       }
       profiles: {
         Row: {
+          address: string | null
+          address_complement: string | null
+          address_number: string | null
           asaas_customer_id: string | null
           asaas_wallet_id: string | null
           avatar_url: string | null
           blocked: boolean
+          city: string | null
           cpf_cnpj: string | null
           created_at: string
+          display_name: string | null
           experience_level: string | null
           full_name: string | null
           full_name_updated_at: string | null
@@ -2740,18 +2760,26 @@ export type Database = {
           interest: string | null
           last_sign_in_at: string | null
           phone: string | null
+          postal_code: string | null
+          province: string | null
+          state: string | null
           terms_accepted_at: string | null
           terms_version: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          address?: string | null
+          address_complement?: string | null
+          address_number?: string | null
           asaas_customer_id?: string | null
           asaas_wallet_id?: string | null
           avatar_url?: string | null
           blocked?: boolean
+          city?: string | null
           cpf_cnpj?: string | null
           created_at?: string
+          display_name?: string | null
           experience_level?: string | null
           full_name?: string | null
           full_name_updated_at?: string | null
@@ -2759,18 +2787,26 @@ export type Database = {
           interest?: string | null
           last_sign_in_at?: string | null
           phone?: string | null
+          postal_code?: string | null
+          province?: string | null
+          state?: string | null
           terms_accepted_at?: string | null
           terms_version?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          address?: string | null
+          address_complement?: string | null
+          address_number?: string | null
           asaas_customer_id?: string | null
           asaas_wallet_id?: string | null
           avatar_url?: string | null
           blocked?: boolean
+          city?: string | null
           cpf_cnpj?: string | null
           created_at?: string
+          display_name?: string | null
           experience_level?: string | null
           full_name?: string | null
           full_name_updated_at?: string | null
@@ -2778,6 +2814,9 @@ export type Database = {
           interest?: string | null
           last_sign_in_at?: string | null
           phone?: string | null
+          postal_code?: string | null
+          province?: string | null
+          state?: string | null
           terms_accepted_at?: string | null
           terms_version?: string | null
           updated_at?: string
@@ -3453,6 +3492,54 @@ export type Database = {
         }
         Relationships: []
       }
+      wallet_ledger: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          id: string
+          order_id: string | null
+          type: string
+          user_id: string
+          withdrawal_log_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          order_id?: string | null
+          type: string
+          user_id: string
+          withdrawal_log_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          order_id?: string | null
+          type?: string
+          user_id?: string
+          withdrawal_log_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wallet_ledger_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wallet_ledger_withdrawal_log_id_fkey"
+            columns: ["withdrawal_log_id"]
+            isOneToOne: false
+            referencedRelation: "withdrawal_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       watermark_configs: {
         Row: {
           created_at: string
@@ -3908,6 +3995,7 @@ export type Database = {
           shirt_size: string
         }[]
       }
+      get_wallet_balance: { Args: { p_user_id: string }; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -3918,6 +4006,11 @@ export type Database = {
       hash_event_password: { Args: { _password: string }; Returns: string }
       increment_blog_views: { Args: { _slug: string }; Returns: undefined }
       infra_metrics_snapshot: { Args: never; Returns: Json }
+      is_coletivo_active_member: {
+        Args: { p_coletivo_id: string }
+        Returns: boolean
+      }
+      is_coletivo_owner: { Args: { p_coletivo_id: string }; Returns: boolean }
       is_event_eligible: { Args: { _event_id: string }; Returns: boolean }
       is_event_organizer: { Args: { _event_id: string }; Returns: boolean }
       is_event_photographer: { Args: { _event_id: string }; Returns: boolean }

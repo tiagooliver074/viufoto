@@ -19,13 +19,13 @@ const ClientNavbar = () => {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
-  const { user, profile, signOut, hasRole } = useAuth();
+  const { user, profile, displayName: profileDisplayName, signOut, hasRole } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { count: favCount } = useFavorites();
   const isCleanTheme = theme === "clean";
 
-  const displayName = profile?.full_name || user?.email?.split("@")[0] || "Usuário";
-  const initials = (profile?.full_name || user?.email || "U")
+  const displayName = profileDisplayName || user?.email?.split("@")[0] || "Usuário";
+  const initials = (profileDisplayName || user?.email || "U")
     .split(/\s+/)
     .map((p) => p[0])
     .filter(Boolean)
