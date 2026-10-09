@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
   if (eventIds.length) {
     const [lv, ord, sr] = await Promise.all([
       supabase.from("marketing_events_log").select("id", { count: "exact", head: true }).in("event_id", eventIds).gte("created_at", since).eq("event_name", "PageView"),
-      supabase.from("orders").select("amount").in("event_id", eventIds).eq("status", "pago").gte("created_at", since),
+      supabase.from("orders").select("amount").in("event_id", eventIds).in("status", ["pago", "enviado"]).gte("created_at", since),
       supabase.from("face_search_logs").select("id", { count: "exact", head: true }).in("event_id", eventIds).gte("created_at", since),
     ]);
     totals.visitors = lv.count || 0;

@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
   }
   for (const o of ordersRes.data || []) {
     const st = stats[(o as any).event_id]; if (!st) continue;
-    if ((o as any).status === "pago") { st.orders++; st.revenue += Number((o as any).amount || 0); }
+    if (["pago", "enviado"].includes((o as any).status)) { st.orders++; st.revenue += Number((o as any).amount || 0); }
   }
 
   const existing = new Set<string>();

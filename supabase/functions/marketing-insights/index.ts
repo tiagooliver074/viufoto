@@ -63,7 +63,7 @@ Deno.serve(async (req) => {
     const [logsRes, searchRes, ordersRes, itemsRes] = await Promise.all([
       supabase.from("marketing_events_log").select("event_id").in("event_id", eventIds).gte("created_at", since).eq("event_name", "PageView"),
       supabase.from("face_search_logs").select("event_id").in("event_id", eventIds).gte("created_at", since),
-      supabase.from("orders").select("id, amount, event_id, created_at").in("event_id", eventIds).eq("status", "pago").gte("created_at", since),
+      supabase.from("orders").select("id, amount, event_id, created_at").in("event_id", eventIds).in("status", ["pago", "enviado"]).gte("created_at", since),
       supabase.from("order_items").select("id, event_photos!inner(event_id)").in("event_photos.event_id", eventIds),
     ]);
 
