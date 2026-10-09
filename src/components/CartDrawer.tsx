@@ -1,10 +1,8 @@
 import { ShoppingCart, X, Trash2, CreditCard, PartyPopper, Film } from "lucide-react";
 import { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCart } from "@/hooks/useCart";
-import { useAuth } from "@/contexts/AuthContext";
 import CheckoutModal from "@/components/checkout/CheckoutModal";
 import { toast } from "sonner";
 import { getPhotoCode } from "@/lib/photoCode";
@@ -14,9 +12,6 @@ const CartDrawer = () => {
   const [open, setOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const { items, removeItem, clearCart, total, count } = useCart();
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
 
   const eventId = items.length > 0 ? items[0].eventId || "" : "";
 
@@ -52,12 +47,8 @@ const CartDrawer = () => {
       toast.error("Erro: evento não identificado");
       return;
     }
-    if (!user) {
-      toast.info("Para continuar com a compra, faça login ou crie sua conta");
-      setOpen(false);
-      navigate("/login", { state: { from: location.pathname, fromCheckout: true } });
-      return;
-    }
+    // Compra sem conta: o modal de pagamento já coleta nome, e-mail e CPF, e o
+    // download logo após pagar funciona com o número do pedido + e-mail.
     setOpen(false);
     setCheckoutOpen(true);
   };

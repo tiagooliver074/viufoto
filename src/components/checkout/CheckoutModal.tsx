@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, CreditCard, QrCode, Copy, CheckCircle2, Loader2 } from "lucide-react";
+import { X, CreditCard, QrCode, Copy, CheckCircle2, Loader2, Download } from "lucide-react";
 import { useAsaasCheckout } from "@/hooks/useAsaasCheckout";
 import { useCart } from "@/hooks/useCart";
 import { useAuth } from "@/contexts/AuthContext";
@@ -40,8 +40,12 @@ const CheckoutModal = ({ open, onClose, eventId }: CheckoutModalProps) => {
   const { createCheckout, loading, pixData, paymentStatus, isPaid, reset } = useAsaasCheckout();
   const { items, total, clearCart } = useCart();
   const { user } = useAuth();
-  const [form, setForm] = useState({ name: "", email: "", cpfCnpj: "" });
+  const [form, setForm] = useState({ name: "", email: "", emailConfirm: "", cpfCnpj: "" });
   const [step, setStep] = useState<"form" | "pix" | "success">("form");
+  // Entrega logo após o pagamento (compra sem conta): o servidor libera o
+  // download com o número do pedido + e-mail usado na compra.
+  const [files, setFiles] = useState<{ id?: string; name?: string | null; type?: string; url?: string | null }[]>([]);
+  const [filesState, setFilesState] = useState<"idle" | "loading" | "ready" | "error">("idle");
 
   // Fetch profile to pre-fill form
   const { data: profile } = useQuery({
@@ -87,6 +91,7 @@ const CheckoutModal = ({ open, onClose, eventId }: CheckoutModalProps) => {
       setForm(prev => ({
         name: profile?.full_name || prev.name,
         email: user.email || prev.email,
+        emailConfirm: user.email || prev.emailConfirm,
         cpfCnpj: profile?.cpf_cnpj || prev.cpfCnpj,
       }));
     }
@@ -111,6 +116,33 @@ const CheckoutModal = ({ open, onClose, eventId }: CheckoutModalProps) => {
     }
   }, [isPaid, step, clearCart, eventId, pixData?.orderId, finalTotal, items.length, discountPct]);
 
+  // Ao confirmar o pagamento, busca os arquivos para baixar na própria tela.
+  // O webhook do Asaas pode levar alguns segundos para marcar o pedido como
+  // pago, então tentamos algumas vezes antes de mostrar o botão de repetir.
+  const orderId = pixData?.orderId;
+  const buyerEmail = form.email;
+  const fetchFiles = async () => {
+    if (!orderId) return;
+    setFilesState("loading");
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const { data, error } = await supabase.functions.invoke("order-download", {
+        body: { action: "download", order_id: orderId, email: buyerEmail.trim() },
+      });
+      if (!error && data?.files) {
+        setFiles(data.files);
+        setFilesState("ready");
+        return;
+      }
+      await new Promise(r => setTimeout(r, 3000));
+    }
+    setFilesState("error");
+  };
+
+  useEffect(() => {
+    if (step === "success" && filesState === "idle") fetchFiles();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step]);
+
   if (!open) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -125,6 +157,10 @@ const CheckoutModal = ({ open, onClose, eventId }: CheckoutModalProps) => {
     }
     if (!isValidEmail(form.email)) {
       toast.error("E-mail inválido. Verifique e tente novamente.");
+      return;
+    }
+    if (!user && form.email.trim().toLowerCase() !== form.emailConfirm.trim().toLowerCase()) {
+      toast.error("Os e-mails não conferem. Confira os dois campos: é nele que você recebe suas fotos.");
       return;
     }
     if (!isValidCpfCnpj(form.cpfCnpj)) {
@@ -189,7 +225,9 @@ const CheckoutModal = ({ open, onClose, eventId }: CheckoutModalProps) => {
   const handleClose = () => {
     reset();
     setStep("form");
-    setForm({ name: "", email: "", cpfCnpj: "" });
+    setFiles([]);
+    setFilesState("idle");
+    setForm({ name: "", email: "", emailConfirm: "", cpfCnpj: "" });
     onClose();
   };
 
@@ -242,11 +280,22 @@ const CheckoutModal = ({ open, onClose, eventId }: CheckoutModalProps) => {
                 />
                 <input
                   type="email"
-                  placeholder="E-mail"
+                  placeholder="E-mail (é nele que você recebe as fotos)"
                   value={form.email}
+                  readOnly={!!user?.email}
                   onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                  className="w-full bg-secondary/50 rounded-lg px-4 py-3 text-sm outline-none border border-border focus:border-primary"
+                  className="w-full bg-secondary/50 rounded-lg px-4 py-3 text-sm outline-none border border-border focus:border-primary read-only:opacity-70"
                 />
+                {!user && (
+                  <input
+                    type="email"
+                    placeholder="Confirme seu e-mail"
+                    value={form.emailConfirm}
+                    onChange={e => setForm(f => ({ ...f, emailConfirm: e.target.value }))}
+                    onPaste={e => e.preventDefault()}
+                    className="w-full bg-secondary/50 rounded-lg px-4 py-3 text-sm outline-none border border-border focus:border-primary"
+                  />
+                )}
                 <input
                   type="text"
                   placeholder="CPF ou CNPJ"
@@ -306,18 +355,63 @@ const CheckoutModal = ({ open, onClose, eventId }: CheckoutModalProps) => {
           )}
 
           {step === "success" && (
-            <div className="space-y-4 text-center py-4">
+            <div className="space-y-4 text-center py-2">
               <CheckCircle2 className="w-16 h-16 text-primary mx-auto" />
               <h3 className="text-xl font-bold">Pagamento confirmado!</h3>
-              <p className="text-sm text-muted-foreground">
-                Suas fotos já estão disponíveis para download.
+
+              {filesState === "loading" && (
+                <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground py-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Preparando suas fotos...
+                </div>
+              )}
+
+              {filesState === "ready" && (
+                <div className="space-y-2 text-left max-h-64 overflow-y-auto">
+                  <p className="text-sm text-muted-foreground text-center">
+                    Suas fotos estão prontas. Baixe agora:
+                  </p>
+                  {files.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-2">Nenhum arquivo encontrado.</p>
+                  )}
+                  {files.map((file, i) => (
+                    <div key={file.id || i} className="flex items-center justify-between gap-3 p-3 rounded-xl bg-secondary/30 border border-border/50">
+                      <p className="text-sm font-medium truncate">{file.name || `Arquivo ${i + 1}`}</p>
+                      {file.url ? (
+                        <a
+                          href={file.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          download
+                          className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-all flex items-center gap-1.5 shrink-0"
+                        >
+                          <Download className="w-3.5 h-3.5" /> Baixar
+                        </a>
+                      ) : (
+                        <span className="text-xs text-red-400">Indisponível</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {filesState === "error" && (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Seu pagamento foi confirmado, mas as fotos ainda estão sendo liberadas.
+                  </p>
+                  <button
+                    onClick={fetchFiles}
+                    className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary/90 transition-all"
+                  >
+                    Tentar novamente
+                  </button>
+                </div>
+              )}
+
+              <p className="text-xs text-muted-foreground">
+                Para rever esta compra depois, acesse <a href="/meus-pedidos" className="text-primary underline">Meus Pedidos</a> com seu e-mail (enviamos um código de confirmação).
               </p>
-              <a
-                href="/meus-pedidos"
-                className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-bold hover:bg-primary/90 transition-all flex items-center justify-center gap-2"
-              >
-                Ir para Meus Pedidos
-              </a>
               <button
                 onClick={handleClose}
                 className="w-full py-3 rounded-xl border border-border text-muted-foreground font-medium hover:text-foreground transition-all"
