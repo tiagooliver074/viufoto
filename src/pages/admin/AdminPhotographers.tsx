@@ -27,7 +27,7 @@ const AdminPhotographers = () => {
         supabase.from("user_roles").select("user_id").eq("role", "photographer"),
         supabase.from("profiles").select("user_id, full_name, avatar_url, cpf_cnpj"),
         supabase.from("events").select("id, organizer_id, plan_type"),
-        supabase.from("orders").select("event_id, amount, status").eq("status", "pago"),
+        supabase.from("orders").select("event_id, amount, status").in("status", ["pago", "enviado"]),
         supabase.from("event_photos").select("id, event_id"),
         supabase.from("photographer_sites").select("user_id"),
       ]);

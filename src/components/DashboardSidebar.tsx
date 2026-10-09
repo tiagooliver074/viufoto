@@ -45,7 +45,7 @@ const DashboardSidebar = () => {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
       const [ordersRes, photosRes, videosRes] = await Promise.all([
-        supabase.from("orders").select("amount").in("event_id", eventIds).eq("status", "pago").gte("created_at", startOfMonth),
+        supabase.from("orders").select("amount").in("event_id", eventIds).in("status", ["pago", "enviado"]).gte("created_at", startOfMonth),
         supabase.from("event_photos").select("id", { count: "exact", head: true }).in("event_id", eventIds),
         supabase.from("event_videos").select("id", { count: "exact", head: true }).in("event_id", eventIds),
       ]);

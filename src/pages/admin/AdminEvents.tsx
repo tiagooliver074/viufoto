@@ -36,7 +36,7 @@ const AdminEvents = () => {
     const [{ data: eventsRaw }, { data: photos }, { data: orders }, { data: profiles }] = await Promise.all([
       supabase.from("events").select("id, name, location, event_date, status, category, plan_type, visibility, organizer_id"),
       supabase.from("event_photos").select("id, event_id"),
-      supabase.from("orders").select("event_id, amount, status").eq("status", "pago"),
+      supabase.from("orders").select("event_id, amount, status").in("status", ["pago", "enviado"]),
       supabase.from("profiles").select("user_id, full_name"),
     ]);
 

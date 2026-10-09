@@ -60,7 +60,7 @@ const AdminPhotographerDetail = () => {
         supabase.from("profiles").select("user_id, full_name, created_at, last_sign_in_at, cpf_cnpj").eq("user_id", id).maybeSingle(),
         supabase.from("events").select("id, name, event_date, plan_type").eq("organizer_id", id),
         supabase.from("event_photos").select("id, event_id"),
-        supabase.from("orders").select("id, event_id, amount, status, created_at, payment_method").eq("status", "pago"),
+        supabase.from("orders").select("id, event_id, amount, status, created_at, payment_method").in("status", ["pago", "enviado"]),
       ]);
 
       setProfile(prof as Profile);

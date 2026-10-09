@@ -130,7 +130,7 @@ export function useEventOrders(eventId: string | undefined) {
     queryKey: ["event-orders", eventId],
     queryFn: async () => {
       if (!eventId) throw new Error("No event ID");
-      const { data, error } = await supabase.from("orders").select("*").eq("event_id", eventId).order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("orders").select("*, order_items(id)").eq("event_id", eventId).order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },

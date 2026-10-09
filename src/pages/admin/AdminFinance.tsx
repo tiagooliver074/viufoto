@@ -56,7 +56,7 @@ const AdminFinance = () => {
   }, [orders, events, profiles, filterStatus, filterEvent, filterPhotographer, filterDateFrom, filterDateTo, searchTx]);
 
   const stats = useMemo(() => {
-    const paid = filtered.filter(o => o.status === "pago");
+    const paid = filtered.filter(o => (o.status === "pago" || o.status === "enviado"));
     const pending = filtered.filter(o => o.status === "aguardando_pagamento");
     const totalRev = paid.reduce((s, o) => s + Number(o.amount), 0);
     let commission = 0;
@@ -76,7 +76,7 @@ const AdminFinance = () => {
   }, [filtered, events]);
 
   const monthlyData = useMemo(() => {
-    const paid = filtered.filter(o => o.status === "pago");
+    const paid = filtered.filter(o => (o.status === "pago" || o.status === "enviado"));
     const now = new Date();
     const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
     const months: { month: string; receita: number; comissao: number }[] = [];
@@ -92,7 +92,7 @@ const AdminFinance = () => {
   }, [filtered, events]);
 
   const planDistribution = useMemo(() => {
-    const paid = filtered.filter(o => o.status === "pago");
+    const paid = filtered.filter(o => (o.status === "pago" || o.status === "enviado"));
     let inicio = 0, pro = 0;
     paid.forEach(o => {
       const ev = events.find(e => e.id === o.event_id);

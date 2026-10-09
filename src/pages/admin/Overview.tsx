@@ -55,7 +55,7 @@ const Overview = () => {
           supabase.from("user_roles").select("user_id").eq("role", "photographer"),
         ]);
 
-        const paidOrders = orders?.filter(o => o.status === "pago") || [];
+        const paidOrders = orders?.filter(o => (o.status === "pago" || o.status === "enviado")) || [];
         const totalRevenue = paidOrders.reduce((sum, o) => sum + Number(o.amount), 0);
         const activeEvents = events?.filter(e => e.status === "ativo").length || 0;
 

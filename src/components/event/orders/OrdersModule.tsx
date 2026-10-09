@@ -52,9 +52,10 @@ export const OrdersModule = ({ onClose }: OrdersModuleProps) => {
     const paid = orders.filter(o => o.status === "pago" || o.status === "enviado").length;
     const pending = orders.filter(o => o.status === "aguardando_pagamento").length;
     const cancelled = orders.filter(o => o.status === "cancelado").length;
-    const gross = orders.reduce((acc, o) => acc + Number(o.amount), 0);
+    const paidList = orders.filter(o => o.status === "pago" || o.status === "enviado");
+    const gross = paidList.reduce((acc, o) => acc + Number(o.amount), 0);
     // Assumed Platform fee is 10% from project context eligibility_rules
-    const net = gross * 0.9;
+    const net = paidList.reduce((acc, o: any) => acc + (o.photographer_net != null ? Number(o.photographer_net) : Number(o.amount) * 0.9), 0);
     const avg = paid > 0 ? gross / paid : 0;
 
     return [

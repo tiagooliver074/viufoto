@@ -81,7 +81,7 @@ const AdminUsers = () => {
     const [{ data: profiles }, { data: roles }, { data: orders }, { data: events }] = await Promise.all([
       supabase.from("profiles").select("id, user_id, full_name, phone, interest, avatar_url, created_at, blocked, last_sign_in_at, cpf_cnpj"),
       supabase.from("user_roles").select("user_id, role"),
-      supabase.from("orders").select("event_id, amount, created_at, status, events!inner(organizer_id)").eq("status", "pago"),
+      supabase.from("orders").select("event_id, amount, created_at, status, events!inner(organizer_id)").in("status", ["pago", "enviado"]),
       supabase.from("events").select("id, organizer_id, plan_type"),
     ]);
 

@@ -109,7 +109,7 @@ const Dashboard = () => {
   });
 
   /* ── order items for sold counts ── */
-  const paidOrders = orders.filter((o) => o.status === "pago");
+  const paidOrders = orders.filter((o) => o.status === "pago" || o.status === "enviado");
   const paidOrderIds = paidOrders.map((o) => o.id);
 
   const { data: orderItems = [] } = useQuery({
@@ -135,7 +135,7 @@ const Dashboard = () => {
     const d = new Date(o.created_at);
     return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
   });
-  const monthPaid = monthOrders.filter((o) => o.status === "pago");
+  const monthPaid = monthOrders.filter((o) => o.status === "pago" || o.status === "enviado");
 
   const revenue = monthPaid.reduce((sum, o) => sum + Number(o.amount), 0);
   const photosSold = orderItems.filter((i) => i.photo_id).length;

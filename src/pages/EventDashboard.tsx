@@ -123,9 +123,12 @@ const EventDashboard = () => {
   const orders = ordersQuery.data || [];
 
   // Computed stats
-  const totalRevenue = orders.reduce((sum, o) => sum + Number(o.amount), 0);
+  // Só pedidos PAGOS entram em faturamento (pago = aprovado; enviado = pago e já entregue)
   const paidOrders = orders.filter(o => o.status === "pago" || o.status === "enviado");
-  const photosSold = paidOrders.length * 2; // simplified
+  const pendingOrders = orders.filter(o => o.status === "aguardando_pagamento");
+  const totalRevenue = paidOrders.reduce((sum, o) => sum + Number(o.amount), 0);
+  const netRevenue = paidOrders.reduce((sum, o) => sum + (o.photographer_net != null ? Number(o.photographer_net) : Number(o.amount) * 0.9), 0);
+  const photosSold = paidOrders.reduce((sum, o: any) => sum + (o.order_items?.length || 0), 0);
   const avgTicket = paidOrders.length > 0 ? (totalRevenue / paidOrders.length) : 0;
 
   const handleAction = (key: string) => {
@@ -520,7 +523,7 @@ const EventDashboard = () => {
                 R$ {totalRevenue.toFixed(2).replace(".", ",")}
               </p>
               <p className="text-xs text-white/85 mt-1">
-                Sua comissão: R$ {(totalRevenue * 0.9).toFixed(2).replace(".", ",")}
+                Sua comissão: R$ {netRevenue.toFixed(2).replace(".", ",")}
               </p>
             </div>
           </div>
@@ -529,10 +532,10 @@ const EventDashboard = () => {
         {/* KPI Row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
           {[
-            { label: "Pedidos", value: String(paidOrders.length), sub: `${photosSold} fotos vendidas` },
-            { label: "Ticket Médio", value: `R$ ${avgTicket.toFixed(2).replace(".", ",")}`, sub: `${paidOrders.length > 0 ? (photosSold / paidOrders.length).toFixed(2) : "0.00"} fotos/pedido` },
+            { label: "Pedidos", value: String(paidOrders.length), sub: `${photosSold} ${photosSold === 1 ? "item vendido" : "itens vendidos"}` },
+            { label: "Ticket Médio", value: `R$ ${avgTicket.toFixed(2).replace(".", ",")}`, sub: `${paidOrders.length > 0 ? (photosSold / paidOrders.length).toFixed(1).replace(".", ",") : "0"} itens/pedido` },
             { label: "Total de Fotos", value: String(photos.length), sub: `${photos.filter(p => p.identified).length} identificadas · ${photos.filter(p => !p.identified).length} sem ID` },
-            { label: "Conversão", value: paidOrders.length > 0 ? "33%" : "0%", sub: "de visitantes que compraram" },
+            { label: "Aguardando pagamento", value: String(pendingOrders.length), sub: "pedidos ainda não pagos" },
           ].map((k, i) => (
             <motion.div
               key={k.label}

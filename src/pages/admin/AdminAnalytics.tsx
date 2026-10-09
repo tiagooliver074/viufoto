@@ -49,7 +49,7 @@ const AdminAnalytics = () => {
       const photographersCount = roles.filter(r => r.role === "photographer" && r.created_at?.startsWith(dayStr)).length;
       const eventsCount = events.filter(e => e.created_at?.startsWith(dayStr)).length;
       const dayOrders = orders.filter(o => o.created_at?.startsWith(dayStr));
-      const revenue = dayOrders.filter(o => o.status === "pago").reduce((s, o) => s + Number(o.amount), 0);
+      const revenue = dayOrders.filter(o => (o.status === "pago" || o.status === "enviado")).reduce((s, o) => s + Number(o.amount), 0);
       days.push({ date: dayStr, label, users: usersCount, photographers: photographersCount, events: eventsCount, orders: dayOrders.length, revenue });
     }
     return days;
@@ -72,7 +72,7 @@ const AdminAnalytics = () => {
   // Top photographers by revenue
   const topPhotographers = useMemo(() => {
     const map = new Map<string, number>();
-    orders.filter(o => o.status === "pago").forEach(o => {
+    orders.filter(o => (o.status === "pago" || o.status === "enviado")).forEach(o => {
       const ev = events.find(e => e.id === o.event_id);
       if (ev) map.set(ev.organizer_id, (map.get(ev.organizer_id) || 0) + Number(o.amount));
     });
@@ -87,7 +87,7 @@ const AdminAnalytics = () => {
     const totalUsers = profiles.length;
     const totalPhotographers = new Set(roles.filter(r => r.role === "photographer").map(r => r.user_id)).size;
     const totalEvents = events.length;
-    const paidOrders = orders.filter(o => o.status === "pago");
+    const paidOrders = orders.filter(o => (o.status === "pago" || o.status === "enviado"));
     const totalRevenue = paidOrders.reduce((s, o) => s + Number(o.amount), 0);
     const totalPhotos = photos.length;
     const totalVideos = videos.length;
