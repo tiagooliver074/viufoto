@@ -286,6 +286,55 @@ async function getPaymentStatus(paymentId: string) {
   return await asaasFetch(`/payments/${paymentId}`);
 }
 
+// Marca o pedido como pago e credita o ledger uma única vez. Mesma regra do
+// asaas-webhook (filtro ledger_credited=false garante que só quem "reivindicar"
+// primeiro credita — webhook e polling podem disputar sem duplicar).
+async function settlePaidOrder(
+  supabaseAdmin: ReturnType<typeof getSupabaseAdmin>,
+  orderId: string | null | undefined,
+  asaasPaymentId: string,
+) {
+  if (!orderId) return;
+
+  const { data: claimed, error } = await supabaseAdmin
+    .from("orders")
+    .update({ status: "pago", ledger_credited: true })
+    .eq("id", orderId)
+    .eq("asaas_payment_id", asaasPaymentId) // o pagamento precisa ser o deste pedido
+    .eq("ledger_credited", false)
+    .select("id, organizer_id, collective_owner_id, collective_fee, photographer_net")
+    .maybeSingle();
+
+  if (error) throw new Error(`settle claim error: ${error.message}`);
+  if (!claimed) return; // já assentado (webhook ou chamada anterior)
+
+  console.log(`[SETTLE] Order ${orderId} marked as paid via status check, crediting wallet_ledger`);
+
+  const entries: Array<Record<string, unknown>> = [];
+  if (claimed.organizer_id && Number(claimed.photographer_net) > 0) {
+    entries.push({
+      user_id: claimed.organizer_id,
+      order_id: claimed.id,
+      type: "credit_sale",
+      amount: claimed.photographer_net,
+      description: `Venda - pedido ${claimed.id}`,
+    });
+  }
+  if (claimed.collective_owner_id && Number(claimed.collective_fee) > 0) {
+    entries.push({
+      user_id: claimed.collective_owner_id,
+      order_id: claimed.id,
+      type: "credit_sale_collective",
+      amount: claimed.collective_fee,
+      description: `Comissão de coletivo - pedido ${claimed.id}`,
+    });
+  }
+  if (entries.length > 0) {
+    const { error: ledgerError } = await supabaseAdmin.from("wallet_ledger").insert(entries);
+    if (ledgerError) console.error("Error crediting wallet_ledger:", ledgerError);
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -451,6 +500,18 @@ Deno.serve(async (req) => {
         });
       }
       const payment = await getPaymentStatus(paymentId);
+
+      // Rede de segurança contra webhook atrasado/perdido: o status vem da API do
+      // Asaas (chamada autenticada com a nossa chave, não do navegador), então é
+      // seguro assentar o pedido aqui. É idempotente com o asaas-webhook.
+      if (payment.status === "RECEIVED" || payment.status === "CONFIRMED") {
+        try {
+          await settlePaidOrder(supabaseAdmin, payment.externalReference, payment.id);
+        } catch (e) {
+          console.error("settlePaidOrder error:", e);
+        }
+      }
+
       return new Response(JSON.stringify({
         status: payment.status,
         confirmedDate: payment.confirmedDate,
