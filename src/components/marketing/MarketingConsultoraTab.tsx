@@ -47,7 +47,7 @@ const MarketingConsultoraTab = () => {
     setSending(true);
 
     try {
-      const url = `https://ccyrargjjpokfwbqkgcl.supabase.co/functions/v1/marketing-consultant`;
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/marketing-consultant`;
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
