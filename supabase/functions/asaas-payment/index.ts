@@ -71,8 +71,142 @@ async function asaasFetch(path: string, options: RequestInit = {}) {
   return data;
 }
 
+// ---------------------------------------------------------------------------
+// Validação de preços no servidor
+// O navegador envia itens e total, mas NADA disso é confiável: o valor cobrado
+// é sempre recalculado aqui a partir do banco (tabela price_grids + desconto
+// progressivo do evento). O total enviado só serve para detectar carrinho
+// desatualizado.
+// ---------------------------------------------------------------------------
+const MIN_ORDER_VALUE = 5; // piso do Asaas para PIX e cartão
+const MAX_ITEMS_PER_ORDER = 500;
+const ID_CHUNK = 100;
+
+class CheckoutValidationError extends Error {
+  status: number;
+  code: string;
+  constructor(status: number, code: string, message: string) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+}
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+// Mesma regra de src/lib/progressiveDiscount.ts
+function pickProgressiveDiscountPct(raw: unknown, photoCount: number): number {
+  if (!Array.isArray(raw)) return 0;
+  const rules = raw
+    .map((r: any) => ({
+      enabled: r?.enabled !== false && r?.active !== false,
+      min_photos: Number(r?.min_photos) || 0,
+      discount_pct: Number(r?.discount_pct) || 0,
+    }))
+    .filter((r) => r.enabled && r.min_photos > 0 && r.discount_pct > 0)
+    .sort((a, b) => a.min_photos - b.min_photos);
+  let pct = 0;
+  for (const r of rules) {
+    if (photoCount >= r.min_photos) pct = r.discount_pct;
+  }
+  return Math.min(Math.max(pct, 0), 100);
+}
+
+async function countOwnedIds(
+  supabaseAdmin: ReturnType<typeof getSupabaseAdmin>,
+  table: "event_photos" | "event_videos",
+  eventId: string,
+  ids: string[],
+): Promise<number> {
+  let found = 0;
+  for (let i = 0; i < ids.length; i += ID_CHUNK) {
+    const chunk = ids.slice(i, i + ID_CHUNK);
+    const { data, error } = await supabaseAdmin
+      .from(table)
+      .select("id")
+      .eq("event_id", eventId)
+      .in("id", chunk);
+    if (error) throw new Error(`Items lookup error: ${error.message}`);
+    found += data?.length ?? 0;
+  }
+  return found;
+}
+
+async function priceCartFromDb(
+  supabaseAdmin: ReturnType<typeof getSupabaseAdmin>,
+  eventId: string,
+  rawItems: any[],
+) {
+  if (!Array.isArray(rawItems) || rawItems.length === 0 || rawItems.length > MAX_ITEMS_PER_ORDER) {
+    throw new CheckoutValidationError(400, "INVALID_ITEMS", "Carrinho inválido. Atualize a página e tente novamente.");
+  }
+
+  const photoIds = new Set<string>();
+  const videoIds = new Set<string>();
+  for (const it of rawItems) {
+    const p = typeof it?.photoId === "string" && it.photoId ? it.photoId : null;
+    const v = typeof it?.videoId === "string" && it.videoId ? it.videoId : null;
+    if ((p && v) || (!p && !v)) {
+      throw new CheckoutValidationError(400, "INVALID_ITEMS", "Carrinho inválido. Atualize a página e tente novamente.");
+    }
+    if (p) photoIds.add(p);
+    if (v) videoIds.add(v);
+  }
+
+  // Preços vigentes do evento (mesma escolha do front: primeira grade criada)
+  const { data: grid, error: gridError } = await supabaseAdmin
+    .from("price_grids")
+    .select("photo_high_price, video_price")
+    .eq("event_id", eventId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (gridError) throw new Error(`Price lookup error: ${gridError.message}`);
+
+  const photoPrice = Number(grid?.photo_high_price ?? 0);
+  const videoPrice = Number(grid?.video_price ?? 0);
+  if ((photoIds.size > 0 && !(photoPrice > 0)) || (videoIds.size > 0 && !(videoPrice > 0))) {
+    throw new CheckoutValidationError(400, "PRICE_NOT_SET", "O fotógrafo ainda não configurou os preços deste evento.");
+  }
+
+  // Todos os itens precisam pertencer ao evento informado
+  const [photosFound, videosFound] = await Promise.all([
+    photoIds.size ? countOwnedIds(supabaseAdmin, "event_photos", eventId, [...photoIds]) : Promise.resolve(0),
+    videoIds.size ? countOwnedIds(supabaseAdmin, "event_videos", eventId, [...videoIds]) : Promise.resolve(0),
+  ]);
+  if (photosFound !== photoIds.size || videosFound !== videoIds.size) {
+    throw new CheckoutValidationError(400, "ITEMS_NOT_IN_EVENT", "Alguns itens do carrinho não estão mais disponíveis. Esvazie o carrinho e adicione novamente.");
+  }
+
+  // Desconto progressivo (colunas podem não existir em todos os ambientes:
+  // se a consulta falhar, segue sem desconto, igual ao comportamento do site)
+  let discountPct = 0;
+  const { data: disc, error: discError } = await supabaseAdmin
+    .from("events")
+    .select("progressive_discount_enabled, progressive_discount_rules")
+    .eq("id", eventId)
+    .maybeSingle();
+  if (!discError && disc?.progressive_discount_enabled) {
+    discountPct = pickProgressiveDiscountPct(disc.progressive_discount_rules, photoIds.size);
+  }
+
+  const factor = 1 - discountPct / 100;
+  const subtotal = round2(photoIds.size * photoPrice + videoIds.size * videoPrice);
+  const total = round2(subtotal * factor);
+
+  const items = [
+    ...[...photoIds].map((id) => ({ photoId: id, videoId: null as string | null, price: round2(photoPrice * factor) })),
+    ...[...videoIds].map((id) => ({ photoId: null as string | null, videoId: id, price: round2(videoPrice * factor) })),
+  ];
+
+  return { items, subtotal, discountPct, total };
+}
+
 // Map raw errors (Asaas / internal) to friendly Portuguese messages
 function mapErrorToFriendly(error: any): { status: number; code: string; message: string } {
+  if (error instanceof CheckoutValidationError) {
+    return { status: error.status, code: error.code, message: error.message };
+  }
   const raw = String(error?.message || "").toLowerCase();
 
   if (raw.includes("cpfcnpj") || raw.includes("cpf") || raw.includes("cnpj inválido") || raw.includes("documento")) {
@@ -162,12 +296,25 @@ Deno.serve(async (req) => {
     const supabaseAdmin = getSupabaseAdmin();
 
     if (action === "create_checkout") {
-      const { name, email, cpfCnpj, eventId, items, total } = params;
+      const { name, email, cpfCnpj, eventId, items: clientItems, total: clientTotal } = params;
 
-      if (!name || !email || !cpfCnpj || !eventId || !items?.length || !total) {
+      if (!name || !email || !cpfCnpj || !eventId || !clientItems?.length) {
         return new Response(JSON.stringify({ error: "Dados incompletos" }), {
           status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
+      }
+
+      // 0. Preço sempre vem do banco; o que o navegador mandou só é conferido.
+      const priced = await priceCartFromDb(supabaseAdmin, eventId, clientItems);
+      const total = priced.total;
+      const items = priced.items;
+
+      if (total < MIN_ORDER_VALUE) {
+        throw new CheckoutValidationError(400, "BELOW_MINIMUM", "O valor mínimo de compra é R$ 5,00 (PIX e cartão). Adicione mais itens ao carrinho.");
+      }
+      if (typeof clientTotal !== "number" || Math.abs(clientTotal - total) > 0.01) {
+        console.warn(`[PRICE_MISMATCH] event=${eventId} client=${clientTotal} server=${total}`);
+        throw new CheckoutValidationError(409, "PRICE_CHANGED", "Os preços deste evento mudaram desde que você montou o carrinho. Esvazie o carrinho e adicione as fotos novamente.");
       }
 
       // 1. Get event to determine plan_type, organizer, and collective info
@@ -253,10 +400,10 @@ Deno.serve(async (req) => {
       // reduzida que nunca foi exposta no checkout (vem sempre "high" do
       // carrinho). Gravamos sempre "high" — a coluna continua existindo no
       // banco (default 'high') só para não exigir uma migração agora.
-      const orderItems = items.map((item: any) => ({
+      const orderItems = items.map((item) => ({
         order_id: order.id,
-        photo_id: item.photoId || null,
-        video_id: item.videoId || null,
+        photo_id: item.photoId,
+        video_id: item.videoId,
         price: item.price,
         resolution: "high",
       }));
