@@ -19,12 +19,8 @@ export function useOrderDetails(orderId: string | undefined) {
         .from("order_items")
         .select(`
           *,
-          event_photos (
-            thumbnail_url
-          ),
-          event_videos (
-            thumbnail_url
-          )
+          event_photos ( file_url, file_name ),
+          event_videos ( file_url, file_name )
         `)
         .eq("order_id", orderId);
 
