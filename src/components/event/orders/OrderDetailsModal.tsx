@@ -86,8 +86,8 @@ export const OrderDetailsModal = ({ orderId, onClose }: OrderDetailsModalProps) 
 
   return (
     <Dialog open={!!orderId} onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0">
-        <DialogHeader className="p-6 pb-0">
+      <DialogContent className="w-[calc(100%-1.5rem)] max-w-3xl max-h-[90vh] overflow-y-auto p-0 rounded-2xl">
+        <DialogHeader className="p-4 sm:p-6 pb-0 pr-12">
           <div className="flex items-center justify-between">
             <div>
               <DialogTitle className="text-xl font-bold flex items-center gap-2">
@@ -116,7 +116,7 @@ export const OrderDetailsModal = ({ orderId, onClose }: OrderDetailsModalProps) 
           </div>
         </DialogHeader>
 
-        <div className="p-6 space-y-8">
+        <div className="p-4 sm:p-6 space-y-6 sm:space-y-8">
           {isLoading ? (
             <div className="py-20 text-center animate-pulse text-muted-foreground">
               Carregando detalhes do pedido...

@@ -345,7 +345,7 @@ export const EventFinancialCenter = ({ open, onClose, eventId: propEventId }: Ev
   if (open) {
     return (
       <Dialog open={open} onOpenChange={(o) => !o && onClose?.()}>
-        <DialogContent hideClose className="max-w-[95vw] w-full h-[90vh] flex flex-col p-0 overflow-hidden bg-background border-border z-[100]">
+        <DialogContent hideClose className="w-[calc(100%-1rem)] max-w-[95vw] h-[90vh] rounded-2xl flex flex-col p-0 overflow-hidden bg-background border-border z-[100]">
           <div className="flex-1 overflow-auto scrollbar-thin">
             {renderContent()}
           </div>

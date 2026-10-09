@@ -89,6 +89,48 @@ export const OrdersModule = ({ onClose }: OrdersModuleProps) => {
     ];
   }, [orders]);
 
+
+  const renderStatus = (status: string) => (
+    <Badge
+      variant="outline"
+      className={`text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md ${
+        status === 'pago' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+        status === 'enviado' ? 'bg-emerald-600 text-white border-emerald-600' :
+        status === 'aguardando_pagamento' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+        'bg-red-50 text-red-700 border-red-200'
+      }`}
+    >
+      {status === 'aguardando_pagamento' ? 'Pendente' : status === 'enviado' ? 'Entregue' : status}
+    </Badge>
+  );
+
+  const renderActions = (order: { id: string; status: string; client_email: string }) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-10 w-10 md:h-8 md:w-8 rounded-lg">
+          <MoreVertical className="w-4 h-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuLabel>Ações do Pedido</DropdownMenuLabel>
+        <DropdownMenuItem className="py-2.5 md:py-1.5" onClick={() => setSelectedOrder(order.id)}>
+          <Eye className="w-4 h-4 mr-2" /> Detalhes
+        </DropdownMenuItem>
+        <DropdownMenuItem className="py-2.5 md:py-1.5" onClick={() => window.open(`mailto:${order.client_email}`)}>
+          <Send className="w-4 h-4 mr-2" /> Enviar E-mail
+        </DropdownMenuItem>
+        {order.status === 'aguardando_pagamento' && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive py-2.5 md:py-1.5" onClick={() => setOrderToCancel(order.id)}>
+              <Trash2 className="w-4 h-4 mr-2" /> Cancelar pedido
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   if (isLoading) {
     return <div className="p-8 text-center animate-pulse text-muted-foreground">Carregando pedidos...</div>;
   }
@@ -163,7 +205,39 @@ export const OrdersModule = ({ onClose }: OrdersModuleProps) => {
           <p className="text-muted-foreground">Ainda não há vendas para este evento ou o filtro não retornou resultados.</p>
         </div>
       ) : (
-        <div className="bg-card border border-border/60 rounded-2xl shadow-sm overflow-hidden">
+        <>
+        <div className="md:hidden space-y-3">
+          {filteredOrders.map((order) => (
+            <div key={order.id} className="bg-card border border-border/60 rounded-2xl shadow-sm p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Avatar className="h-10 w-10 border border-border shrink-0">
+                    <AvatarFallback className="bg-primary/5 text-primary text-xs font-bold">
+                      {order.client_name.slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-sm truncate">{order.client_name}</p>
+                    <p className="text-[10px] text-muted-foreground font-mono">#{order.id.slice(0, 8).toUpperCase()}</p>
+                  </div>
+                </div>
+                {renderActions(order)}
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-bold text-base text-foreground">
+                    R$ {Number(order.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground">
+                    {format(new Date(order.created_at), "dd/MM/yyyy 'às' HH:mm")} · {order.payment_method === 'pix' ? 'Pix' : (order.payment_method || '—')}
+                  </p>
+                </div>
+                {renderStatus(order.status)}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="hidden md:block bg-card border border-border/60 rounded-2xl shadow-sm overflow-hidden">
           <Table>
             <TableHeader className="bg-muted/30">
               <TableRow>
@@ -215,52 +289,21 @@ export const OrdersModule = ({ onClose }: OrdersModuleProps) => {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge 
-                      variant="outline" 
-                      className={`
-                        text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md
-                        ${order.status === 'pago' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 
-                          order.status === 'enviado' ? 'bg-emerald-600 text-white border-emerald-600' : 
-                          order.status === 'aguardando_pagamento' ? 'bg-amber-50 text-amber-700 border-amber-200' : 
-                          'bg-red-50 text-red-700 border-red-200'}
-                      `}
-                    >
-                      {order.status === 'aguardando_pagamento' ? 'Pendente' : order.status === 'enviado' ? 'Entregue' : order.status}
-                    </Badge>
+                    {renderStatus(order.status)}
                   </TableCell>
                   <TableCell className="text-right pr-6">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg">
-                          <MoreVertical className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
-                        <DropdownMenuLabel>Ações do Pedido</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => setSelectedOrder(order.id)}>
-                          <Eye className="w-4 h-4 mr-2" /> Detalhes
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => window.open(`mailto:${order.client_email}`)}>
-                          <Send className="w-4 h-4 mr-2" /> Enviar E-mail
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        {order.status === 'aguardando_pagamento' && (
-                          <DropdownMenuItem className="text-destructive" onClick={() => setOrderToCancel(order.id)}>
-                            <Trash2 className="w-4 h-4 mr-2" /> Cancelar pedido
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {renderActions(order)}
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
+        </>
       )}
 
       <Dialog open={!!orderToCancel} onOpenChange={(o) => !o && !cancelling && setOrderToCancel(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[calc(100%-2rem)] max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle>Cancelar este pedido?</DialogTitle>
           </DialogHeader>
