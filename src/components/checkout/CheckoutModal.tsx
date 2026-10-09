@@ -380,9 +380,8 @@ const CheckoutModal = ({ open, onClose, eventId }: CheckoutModalProps) => {
                       {file.url ? (
                         <a
                           href={file.url}
-                          target="_blank"
                           rel="noopener noreferrer"
-                          download
+                          download={file.name || undefined}
                           className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-xs font-bold hover:bg-primary/90 transition-all flex items-center gap-1.5 shrink-0"
                         >
                           <Download className="w-3.5 h-3.5" /> Baixar

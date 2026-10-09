@@ -20,8 +20,15 @@ const READ_EXPIRES_IN = 86400; // 24h — mesmo prazo usado antes via gateway da
 
 const s3 = new S3Client({ region: REGION, credentials: { accessKeyId: ACCESS_KEY_ID, secretAccessKey: SECRET_ACCESS_KEY } });
 
-async function signRead(objectPath: string): Promise<string> {
-  const cmd = new GetObjectCommand({ Bucket: BUCKET, Key: objectPath });
+async function signRead(objectPath: string, downloadName?: string): Promise<string> {
+  // Com downloadName, o S3 responde com Content-Disposition: attachment, então o
+  // navegador (PC e celular) SALVA o arquivo em vez de abrir em outra aba.
+  const safe = downloadName ? downloadName.replace(/[^\w.\- ]/g, "_") : "";
+  const cmd = new GetObjectCommand({
+    Bucket: BUCKET,
+    Key: objectPath,
+    ...(safe ? { ResponseContentDisposition: `attachment; filename="${safe}"` } : {}),
+  });
   return await getSignedUrl(s3, cmd, { expiresIn: READ_EXPIRES_IN });
 }
 
@@ -219,7 +226,7 @@ Deno.serve(async (req) => {
         }
 
         try {
-          const url = await signRead(file.path);
+          const url = await signRead(file.path, file.name ?? undefined);
           signedFiles.push({ ...file, url });
         } catch {
           signedFiles.push({ ...file, url: null, error: "Erro interno" });
@@ -329,7 +336,7 @@ Deno.serve(async (req) => {
           continue;
         }
         try {
-          const url = await signRead(file.path);
+          const url = await signRead(file.path, file.name ?? undefined);
           signedFiles.push({ ...file, url });
         } catch {
           signedFiles.push({ ...file, url: null });
