@@ -10,7 +10,7 @@ const steps = ["Monetização", "Informações", "Busca", "Visibilidade", "Resum
 
 const COMMISSION_RATE = 0.10; // 10% fixos
 const DEFAULT_SIM_PRICE = 15;
-const MIN_PHOTO_PRICE = 3;
+const MIN_PHOTO_PRICE = 5; // piso do Asaas para PIX e cartão
 const DEFAULT_VIDEO_PRICE = 15;
 
 const categories = [
@@ -234,7 +234,7 @@ const CriarEvento = () => {
 
       if (error) throw error;
 
-      // Grade padrão: foto = simPrice (mín R$ 3,00); vídeo = R$ 15,00 (sugerido fixo, editável na grade)
+      // Grade padrão: foto = simPrice (mín R$ 5,00); vídeo = R$ 15,00 (sugerido fixo, editável na grade)
       const highPrice = Math.max(MIN_PHOTO_PRICE, Number(simPrice) || DEFAULT_SIM_PRICE);
       const videoPrice = DEFAULT_VIDEO_PRICE;
       await supabase.from("price_grids").insert({
@@ -378,7 +378,7 @@ const CriarEvento = () => {
                   <div>
                     <h3 className="text-sm font-bold text-foreground">Simulação financeira</h3>
                     <p className="text-[11px] text-muted-foreground">
-                      Este valor será usado como preço da foto na grade padrão do evento. Mínimo R$ 3,00.{" "}
+                      Este valor será usado como preço da foto na grade padrão do evento. Mínimo R$ 5,00 (valor mínimo aceito no PIX e no cartão).{" "}
                     </p>
                   </div>
 

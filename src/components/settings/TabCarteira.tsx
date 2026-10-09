@@ -158,12 +158,12 @@ const TabCarteira = () => {
   };
 
   const handleSave = async () => {
-    if (!name.trim() || !cpfCnpj.trim()) {
-      toast.error("Preencha todos os campos obrigatórios");
-      return;
-    }
-    if (!phone.trim()) {
-      toast.error("Telefone é obrigatório");
+    const missing: string[] = [];
+    if (!name.trim()) missing.push("nome completo");
+    if (!cpfCnpj.trim()) missing.push("CPF/CNPJ");
+    if (!phone.trim()) missing.push("telefone");
+    if (missing.length > 0) {
+      toast.error(`Falta preencher: ${missing.join(", ")}. Complete os dados abaixo para ativar o recebimento.`);
       return;
     }
     const cleanCpf = cpfCnpj.replace(/\D/g, "");

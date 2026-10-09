@@ -22,7 +22,8 @@ export default function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
-      toast.error("Preencha todos os campos");
+      const missing = [!email && "e-mail", !password && "senha"].filter(Boolean).join(" e ");
+      toast.error(`Falta preencher: ${missing}.`);
       return;
     }
     setLoading(true);

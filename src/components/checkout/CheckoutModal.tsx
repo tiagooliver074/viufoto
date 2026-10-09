@@ -143,8 +143,8 @@ const CheckoutModal = ({ open, onClose, eventId }: CheckoutModalProps) => {
       toast.error("Há itens sem preço válido. Remova-os e adicione novamente.");
       return;
     }
-    if (finalTotal < 7) {
-      toast.error("O valor mínimo para pagamento via PIX é R$ 7,00. Adicione mais itens ao carrinho.");
+    if (finalTotal < 5) {
+      toast.error("O valor mínimo de compra é R$ 5,00 (PIX e cartão). Adicione mais itens ao carrinho.");
       return;
     }
     try {

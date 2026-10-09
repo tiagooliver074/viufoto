@@ -56,8 +56,15 @@ export default function Cadastro() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.fullName || !form.email || !form.password || !form.cpfCnpj || !form.phone) {
-      toast.error("Preencha todos os campos obrigatórios");
+    const missing: string[] = [];
+    if (!form.fullName.trim()) missing.push("nome completo");
+    if (!form.email.trim()) missing.push("e-mail");
+    if (!form.cpfCnpj.trim()) missing.push("CPF/CNPJ");
+    if (!form.phone.trim()) missing.push("celular");
+    if (!form.password) missing.push("senha");
+    if (form.password && !form.confirmPassword) missing.push("confirmação da senha");
+    if (missing.length > 0) {
+      toast.error(`Falta preencher: ${missing.join(", ")}.`);
       return;
     }
     if (!isValidCpfCnpj(form.cpfCnpj)) {

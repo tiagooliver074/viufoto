@@ -196,7 +196,7 @@ const Dashboard = () => {
             <div className="flex-1">
               <p className="font-semibold text-sm text-foreground">Configure seu recebimento para começar a vender</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Suas vendas estão bloqueadas até que você configure os dados de recebimento.
+                Para vender, complete seus dados em Configurações › Minha Conta (nome, CPF e telefone) e ative o recebimento na aba Carteira.
               </p>
             </div>
             <Link

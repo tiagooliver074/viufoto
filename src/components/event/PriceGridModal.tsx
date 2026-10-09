@@ -21,7 +21,7 @@ interface Props {
   clientShare?: number;
 }
 
-const MIN_PHOTO_PRICE = 3;
+const MIN_PHOTO_PRICE = 5; // piso do Asaas para PIX e cartão
 const MIN_VIDEO_PRICE = 10;
 const DEFAULT_PHOTO_PRICE = 15;
 const DEFAULT_VIDEO_PRICE = 15;

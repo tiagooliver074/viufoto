@@ -59,8 +59,12 @@ const TabFinanceiro = () => {
   };
 
   const handleSave = async () => {
-    if (!name.trim() || !cpfCnpj.trim() || !email.trim()) {
-      toast.error("Preencha todos os campos obrigatórios");
+    const missing: string[] = [];
+    if (!name.trim()) missing.push("nome completo");
+    if (!cpfCnpj.trim()) missing.push("CPF/CNPJ");
+    if (!email.trim()) missing.push("e-mail");
+    if (missing.length > 0) {
+      toast.error(`Falta preencher: ${missing.join(", ")}. Complete os dados para ativar o recebimento.`);
       return;
     }
 
