@@ -808,7 +808,7 @@ const EventDashboard = () => {
         )}
       </main>
       <Dialog open={showOrders} onOpenChange={setShowOrders}>
-        <DialogContent className="max-w-6xl h-[90vh] overflow-hidden flex flex-col p-0 bg-background border-border">
+        <DialogContent hideClose className="max-w-6xl h-[90vh] overflow-hidden flex flex-col p-0 bg-background border-border">
           <div className="p-0 overflow-y-auto flex-1 scrollbar-thin">
             <OrdersModule onClose={() => setShowOrders(false)} />
           </div>

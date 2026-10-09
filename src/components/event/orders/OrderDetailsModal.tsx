@@ -104,12 +104,13 @@ export const OrderDetailsModal = ({ orderId, onClose }: OrderDetailsModalProps) 
                 variant="outline" 
                 className={`
                   text-[10px] font-bold uppercase tracking-widest px-2.5 py-1
-                  ${(order.status === 'pago' || order.status === 'enviado') ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 
+                  ${order.status === 'pago' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 
+                    order.status === 'enviado' ? 'bg-emerald-600 text-white border-emerald-600' : 
                     order.status === 'aguardando_pagamento' ? 'bg-amber-50 text-amber-700 border-amber-200' : 
                     'bg-red-50 text-red-700 border-red-200'}
                 `}
               >
-                {order.status === 'aguardando_pagamento' ? 'Pendente' : order.status}
+                {order.status === 'aguardando_pagamento' ? 'Pendente' : order.status === 'enviado' ? 'Entregue' : order.status}
               </Badge>
             )}
           </div>

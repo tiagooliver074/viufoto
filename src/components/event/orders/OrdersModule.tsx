@@ -1,4 +1,7 @@
 import { useState, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 import { useParams } from "react-router-dom";
 import { useEventOrders, useEvent } from "@/hooks/useEvent";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -32,6 +35,26 @@ export const OrdersModule = ({ onClose }: OrdersModuleProps) => {
   const { data: orders = [], isLoading } = useEventOrders(id);
   const [search, setSearch] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
+  const [orderToCancel, setOrderToCancel] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const queryClient = useQueryClient();
+
+  const confirmCancel = async () => {
+    if (!orderToCancel) return;
+    setCancelling(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("cancel-order", { body: { order_id: orderToCancel } });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success("Pedido cancelado.");
+      queryClient.invalidateQueries({ queryKey: ["event-orders"] });
+    } catch (e: any) {
+      toast.error(e?.message || "Não foi possível cancelar o pedido");
+    } finally {
+      setCancelling(false);
+      setOrderToCancel(null);
+    }
+  };
   const [statusFilter, setStatusFilter] = useState<string>("todos");
 
   const filteredOrders = useMemo(() => {
@@ -71,7 +94,7 @@ export const OrdersModule = ({ onClose }: OrdersModuleProps) => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-5 sm:p-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <PageTitle className="text-2xl">Centro de Pedidos</PageTitle>
@@ -119,12 +142,13 @@ export const OrdersModule = ({ onClose }: OrdersModuleProps) => {
             <DropdownMenuTrigger asChild>
               <Button variant="outline" className="h-10 gap-2 rounded-xl whitespace-nowrap">
                 <Filter className="w-4 h-4" /> 
-                {statusFilter === "todos" ? "Status" : statusFilter.replace("_", " ")}
+                {statusFilter === "todos" ? "Status" : statusFilter === "enviado" ? "entregue" : statusFilter === "aguardando_pagamento" ? "pendente" : statusFilter}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => setStatusFilter("todos")}>Todos</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setStatusFilter("pago")}>Pago</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setStatusFilter("enviado")}>Entregue</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setStatusFilter("aguardando_pagamento")}>Pendente</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setStatusFilter("cancelado")}>Cancelado</DropdownMenuItem>
             </DropdownMenuContent>
@@ -196,11 +220,12 @@ export const OrdersModule = ({ onClose }: OrdersModuleProps) => {
                       className={`
                         text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md
                         ${order.status === 'pago' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 
+                          order.status === 'enviado' ? 'bg-emerald-600 text-white border-emerald-600' : 
                           order.status === 'aguardando_pagamento' ? 'bg-amber-50 text-amber-700 border-amber-200' : 
                           'bg-red-50 text-red-700 border-red-200'}
                       `}
                     >
-                      {order.status === 'aguardando_pagamento' ? 'Pendente' : order.status}
+                      {order.status === 'aguardando_pagamento' ? 'Pendente' : order.status === 'enviado' ? 'Entregue' : order.status}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right pr-6">
@@ -219,9 +244,11 @@ export const OrdersModule = ({ onClose }: OrdersModuleProps) => {
                           <Send className="w-4 h-4 mr-2" /> Enviar E-mail
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-destructive">
-                          <Trash2 className="w-4 h-4 mr-2" /> Cancelar
-                        </DropdownMenuItem>
+                        {order.status === 'aguardando_pagamento' && (
+                          <DropdownMenuItem className="text-destructive" onClick={() => setOrderToCancel(order.id)}>
+                            <Trash2 className="w-4 h-4 mr-2" /> Cancelar pedido
+                          </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -231,6 +258,23 @@ export const OrdersModule = ({ onClose }: OrdersModuleProps) => {
           </Table>
         </div>
       )}
+
+      <Dialog open={!!orderToCancel} onOpenChange={(o) => !o && !cancelling && setOrderToCancel(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Cancelar este pedido?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            O pedido ainda não foi pago. Ao cancelar, a cobrança também é cancelada e o cliente não conseguirá mais pagá-la.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" disabled={cancelling} onClick={() => setOrderToCancel(null)}>Voltar</Button>
+            <Button variant="destructive" disabled={cancelling} onClick={confirmCancel}>
+              {cancelling ? "Cancelando..." : "Cancelar pedido"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {selectedOrder && (
         <OrderDetailsModal 
