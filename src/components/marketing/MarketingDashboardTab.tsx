@@ -45,7 +45,7 @@ const MarketingDashboardTab = () => {
           .from("orders")
           .select("id, amount")
           .in("event_id", eventIds)
-          .eq("status", "pago")
+          .in("status", ["pago", "enviado"])
           .gte("created_at", since),
         supabase
           .from("order_items")

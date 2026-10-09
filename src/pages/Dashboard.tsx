@@ -152,7 +152,7 @@ const Dashboard = () => {
     const total = orders
       .filter((o) => {
         const od = new Date(o.created_at);
-        return od.getMonth() === m && od.getFullYear() === y && o.status === "pago";
+        return od.getMonth() === m && od.getFullYear() === y && (o.status === "pago" || o.status === "enviado");
       })
       .reduce((s, o) => s + Number(o.amount), 0);
     return { name: label, valor: total };

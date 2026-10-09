@@ -37,7 +37,7 @@ const MarketingRelatoriosTab = () => {
       }
 
       const [ordersRes, logsRes] = await Promise.all([
-        supabase.from("orders").select("id, amount, event_id, created_at").in("event_id", eventIds).eq("status", "pago").gte("created_at", sinceIso),
+        supabase.from("orders").select("id, amount, event_id, created_at").in("event_id", eventIds).in("status", ["pago", "enviado"]).gte("created_at", sinceIso),
         supabase.from("marketing_events_log" as any).select("event_id, created_at, event_name").in("event_id", eventIds).gte("created_at", sinceIso),
       ]);
 

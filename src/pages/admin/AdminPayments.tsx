@@ -78,7 +78,7 @@ const AdminPayments = () => {
 
   const stats = useMemo(() => {
     const total = payments.length;
-    const paid = payments.filter(p => p.status === "pago").length;
+    const paid = payments.filter(p => (p.status === "pago" || p.status === "enviado")).length;
     const pending = payments.filter(p => p.status === "aguardando_pagamento").length;
     const noWallet = payments.filter(p => !p.payoutConfigured).length;
     return { total, paid, pending, noWallet };

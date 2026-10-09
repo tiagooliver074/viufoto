@@ -73,7 +73,7 @@ const Clientes = () => {
         .from("orders")
         .select("id, event_id, client_name, client_email, status, amount, created_at")
         .in("event_id", eventIds)
-        .eq("status", "pago");
+        .in("status", ["pago", "enviado"]);
       const orderIds = (orders || []).map((o) => o.id);
       let items: any[] = [];
       if (orderIds.length) {
